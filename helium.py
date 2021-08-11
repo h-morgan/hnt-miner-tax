@@ -4,7 +4,6 @@ import pandas as pd
 import json, time, random
 import click
 
-ACCOUNT = "13d5xg6qzdE2sVtep6GtbYtJ3fPCvxwpjMWSD4L7hBtSVrrjfZR"
 
 URL_ACCOUNTS_BASE = "https://api.helium.io/v1/accounts"
 URL_HOTSPOTS_BASE = "https://api.helium.io/v1/hotspots"
@@ -50,7 +49,7 @@ def get_request(url, try_number=1):
     return res_data
 
 
-def get_transaction_data(cursor, base_trans_url, hotspot_addr, prev=None):
+def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev=None):
     """
     Recursive function to run through transaction data paging through each cursor if present
     """
@@ -78,13 +77,13 @@ def get_transaction_data(cursor, base_trans_url, hotspot_addr, prev=None):
         usd = oracle_price * hnt_amt
 
         # build list of elements to add to our final all_transactions list (later to be used to build our df)
-        reward_record = [timestamp, ACCOUNT, hotspot_addr, block, hnt_amt, oracle_price, usd, hash]
+        reward_record = [timestamp, wallet_addr, hotspot_addr, block, hnt_amt, oracle_price, usd, hash]
         previous_data.append(reward_record)
 
     # Call the function again with new cursor value
     if 'cursor' in cursor_data:
         print("getting next round of data from next cursor")
-        return get_transaction_data(cursor_data['cursor'], base_trans_url, hotspot_addr, prev=previous_data)
+        return get_transaction_data(cursor_data['cursor'], base_trans_url, wallet_addr, hotspot_addr, prev=previous_data)
 
     else:
         return previous_data
@@ -121,7 +120,7 @@ def main(account, year):
         # get all data by paging through the cursors until we are done
         if 'cursor' in transaction_data:
             print("Getting initial cursor data")
-            all_hs_data = get_transaction_data(transaction_data['cursor'], url_transactions, hotspot_addr=hs_address, prev=None)
+            all_hs_data = get_transaction_data(transaction_data['cursor'], url_transactions, wallet_addr=account, hotspot_addr=hs_address, prev=None)
 
             if all_hs_data:
                 all_transactions.extend(all_hs_data)
