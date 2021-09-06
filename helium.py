@@ -143,6 +143,7 @@ def helium(account, year):
     """
     Kickoff point of script, gets cli args and runs main script
     """
+
     # make sure year is numeric
     if not year.isnumeric() or len(year) != 4:
         print('Year must be a numeric of format YYYY')
