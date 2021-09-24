@@ -33,7 +33,7 @@ def generate_rewards_csv(account, year):
     
     else:
         print(f"Account found on Helium blockchain, processing request for tax year {year}.")
-        get_helium_rewards(account, year, save_csv=True)
+        usd_rewards = get_helium_rewards(account, year, save_csv=True)
 
     
 @cli.command(name="taxes")
