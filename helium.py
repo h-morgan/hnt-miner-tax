@@ -54,7 +54,6 @@ def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev
     """
     Recursive function to run through transaction data paging through each cursor if present
     """
-
     if prev is None:
         previous_data = []
     else:
@@ -83,7 +82,7 @@ def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev
 
     # Call the function again with new cursor value
     if 'cursor' in cursor_data:
-        logger.debug("Getting next round of data from next cursor")
+        logger.info("Getting next round of data from next cursor")
         return get_transaction_data(cursor_data['cursor'], base_trans_url, wallet_addr, hotspot_addr, prev=previous_data)
 
     else:
@@ -109,14 +108,14 @@ def get_helium_rewards(account, year, save_csv=False):
     
         # Get identifying info needed for this hotspot - timezone and hotspot address/id
         hs_address = hotspot['address']
-        logger.info("HOTSPOT ADDRESS:", hs_address)
+        logger.info(f"HOTSPOT ADDRESS: {hs_address}")
 
         # loop through each hotspot and get transactions for it
         url_query = f"rewards?max_time={year}-12-31&min_time={year}-01-01"
         url_transactions = '/'.join([URL_HOTSPOTS_BASE, hs_address, url_query])
 
         transaction_data = get_request(url_transactions)
-        logger.debug("Cursor:", transaction_data['cursor'])
+        logger.info(f"Cursor: {transaction_data['cursor']}")
 
         # get all data by paging through the cursors until we are done
         if 'cursor' in transaction_data:
@@ -144,10 +143,15 @@ def compute_taxes(input_json):
     Takes in input data in json format, calls get_helium_rewards to determine rewards amount,
     sums up expenses, subtracts expenses from total amount
     """
-
-    # First get the tax year and helium wallet address to get rewards
+    firstname = input_json['first_name']
+    lastname = input_json['last_name']
     tax_year = input_json['tax_year']
     wallet_address = input_json['helium_wallet_address']
+
+    logger.info(f"Preparing {tax_year} HNT taxes for: {firstname} {lastname}")
+    logger.info(f"HNT wallet address: {wallet_address}")
+
+    # use tax year and helium wallet address to get rewards
     rewards_usd = get_helium_rewards(wallet_address, tax_year)
 
     # Sum up all expenses
