@@ -1,9 +1,10 @@
-from click.termui import prompt
 import requests
 import pandas as pd
 import json, time, random
-import click
+import logging
 
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 URL_ACCOUNTS_BASE = "https://api.helium.io/v1/accounts"
 URL_HOTSPOTS_BASE = "https://api.helium.io/v1/hotspots"
@@ -23,12 +24,12 @@ def query_helium_cursor(cursor, base_trans_url, try_number=1):
         cursor_data = cursor_response.json()
     
     except:
-        print(f"Hit an error, trying to hit url again: {url_cursor}")
+        logger.warn(f"Hit an error, trying to hit url again: {url_cursor}")
         time.sleep(2**try_number + random.random()*0.01) #exponential backoff
         return query_helium_cursor(cursor, base_trans_url, try_number=try_number+1)
     
     num_data_entries = len(cursor_data['data'])
-    print(f"Retrieved cursor data, found {num_data_entries} new transactions")
+    logger.info(f"Retrieved cursor data, found {num_data_entries} new transactions")
     return cursor_data
 
 
@@ -41,8 +42,8 @@ def get_request(url, try_number=1):
         res_data = res.json()
     
     except Exception as e:
-        print(f"Error performing request, trying to hit url again: {url}")
-        print("ERROR MSG:", e)
+        logger.error(f"Error performing request, trying to hit url again: {url}")
+        logger.error(f"Exception hit: {e}")
         time.sleep(2**try_number + random.random()*0.01) #exponential backoff
         return get_request(url, try_number=try_number+1)
     
@@ -82,14 +83,14 @@ def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev
 
     # Call the function again with new cursor value
     if 'cursor' in cursor_data:
-        print("getting next round of data from next cursor")
+        logger.debug("Getting next round of data from next cursor")
         return get_transaction_data(cursor_data['cursor'], base_trans_url, wallet_addr, hotspot_addr, prev=previous_data)
 
     else:
         return previous_data
 
 
-def main(account, year):
+def get_helium_rewards(account, year, save_csv=False):
     """
     Hit the helium api to retreive the total rewards for all hotspots associated with an account
     """
@@ -99,7 +100,7 @@ def main(account, year):
     account_data = get_request(url_accounts)
 
     num_hotspots = len(account_data['data'])
-    print(f"Number of hotspots found associated with account = {num_hotspots}")
+    logger.info(f"Number of hotspots found associated with account = {num_hotspots}")
 
     # Loop through each hotspot to look at rewards associated with that hotspot address
     all_transactions = []
@@ -108,18 +109,18 @@ def main(account, year):
     
         # Get identifying info needed for this hotspot - timezone and hotspot address/id
         hs_address = hotspot['address']
-        print("HOTSPOT ADDRESS:", hs_address)
+        logger.info("HOTSPOT ADDRESS:", hs_address)
 
         # loop through each hotspot and get transactions for it
         url_query = f"rewards?max_time={year}-12-31&min_time={year}-01-01"
         url_transactions = '/'.join([URL_HOTSPOTS_BASE, hs_address, url_query])
 
         transaction_data = get_request(url_transactions)
-        print(transaction_data['cursor'])
+        logger.debug("Cursor:", transaction_data['cursor'])
 
         # get all data by paging through the cursors until we are done
         if 'cursor' in transaction_data:
-            print("Getting initial cursor data")
+            logger.info("Getting initial cursor data")
             all_hs_data = get_transaction_data(transaction_data['cursor'], url_transactions, wallet_addr=account, hotspot_addr=hs_address, prev=None)
 
             if all_hs_data:
@@ -128,41 +129,40 @@ def main(account, year):
     df_columns = ['timestamp', 'account', 'hotspot_address', 'block', 'hnt', 'oracle_price', 'usd', 'hash']
     df = pd.DataFrame(all_transactions, columns=df_columns)
 
-    print(f"Compilation of all reward transactions from year {year} complete. Saving to csv file for review.")
-    df.to_csv(f"{account[-8:]}_{year}.csv")
+    if save_csv:
+        logger.info(f"Compilation of all reward transactions from year {year} complete. Saving to csv file for review.")
+        df.to_csv(f"{account[-8:]}_{year}.csv")
 
     # Once csv is compiled, we need the total in the USD column 
     total_usd = round(df['usd'].sum(), 4)
-    print(f"Total usd income for year {year}: ${total_usd}")
+    logger.info(f"Total usd income for year {year}: ${total_usd}")
+    return total_usd
 
 
-@click.command()
-@click.option("--account", prompt=True)
-@click.option("--year", prompt=True)
-def helium(account, year):
+def compute_taxes(input_json):
     """
-    Kickoff point of script, gets cli args and runs main script
+    Takes in input data in json format, calls get_helium_rewards to determine rewards amount,
+    sums up expenses, subtracts expenses from total amount
     """
 
-    # make sure year is numeric
-    if not year.isnumeric() or len(year) != 4:
-        print('Year must be a numeric of format YYYY')
-        return
+    # First get the tax year and helium wallet address to get rewards
+    tax_year = input_json['tax_year']
+    wallet_address = input_json['helium_wallet_address']
+    rewards_usd = get_helium_rewards(wallet_address, tax_year)
 
-    # determine if the account requested exists in helium
-    verify_account_url = URL_ACCOUNTS_BASE + '/' + account
-    valid_account_data = get_request(verify_account_url)
+    # Sum up all expenses
+    expenses_list = input_json['expenses']
 
-    # Block value of account -if "null", invalid Helium acct
-    block = valid_account_data['data']['block']
-    if not block:
-        print("Helium account address requested is invalid")
+    expenses_usd_sum = 0
+    for expense in expenses_list:
+        exp_type = expense['type']
+        exp_amt = expense['amount_usd']
+        expenses_usd_sum += exp_amt
+        logger.debug(f"Expense: {exp_type} --> Amount: ${exp_amt}")
+
+    logger.info(f"Sum of all expenses: ${expenses_usd_sum}")
+
+    # Subtract expense from rewards
+    taxable_earnings = rewards_usd - expenses_usd_sum
+    logger.info(f"Total taxable earnings for year {tax_year}: ${taxable_earnings}")
     
-    else:
-        print(f"Account found on Helium blockchain, processing request for tax year {year}.")
-        main(account, year)
-
-
-if __name__ == "__main__":
-
-    helium()
