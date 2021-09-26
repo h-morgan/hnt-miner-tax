@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import json, time, random
 import logging
+from utils import fill_pdf
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,35 +139,89 @@ def get_helium_rewards(account, year, save_csv=False):
     return total_usd
 
 
+def write_data_to_1040(output_filename, data):
+    """
+    Writes data dict to output_filename provided, overlaying the 1040 schedule c form
+    """
+    pdf_file = "tax_forms/f1040sc.pdf"
+    key_file = "tax_forms/f1040sc_key.json"
+    output_file = "output/" + output_filename
+
+    pdf_keys = json.load(open(key_file, 'r'))
+    
+    # Build fillable data to input to pdf filler fn
+    fillable_data = {}
+    for key, value in pdf_keys.items():
+        if key in data.keys():
+            fillable_data[value] = data[key]
+
+    logger.info(f"Saving completed 1040 schedule c for to: {output_file}")
+    fill_pdf(pdf_file, output_file, fillable_data)
+
+
 def compute_taxes(input_json):
     """
-    Takes in input data in json format, calls get_helium_rewards to determine rewards amount,
-    sums up expenses, subtracts expenses from total amount
+    Takes in input data in json format, calls get_helium_rewards and performs steps to fill pdf
     """
     firstname = input_json['first_name']
     lastname = input_json['last_name']
     tax_year = input_json['tax_year']
     wallet_address = input_json['helium_wallet_address']
+    address_line1 = input_json['address']['street']
+    address_line2 = input_json['address']['city'] + ' ' + input_json['address']['state']
 
     logger.info(f"Preparing {tax_year} HNT taxes for: {firstname} {lastname}")
     logger.info(f"HNT wallet address: {wallet_address}")
 
+    # build input pdf data as we go
+    tax_data = {
+        "name of proprietor": f"{firstname} {lastname}",
+        "E1": address_line1,
+        "E2": address_line2
+    }
+
     # use tax year and helium wallet address to get rewards
-    rewards_usd = get_helium_rewards(wallet_address, tax_year)
+    #rewards_usd = get_helium_rewards(wallet_address, tax_year)
+    rewards_usd = 2400.00
+    tax_data['1-line'] = rewards_usd
+    tax_data['7'] = rewards_usd
 
     # Sum up all expenses
     expenses_list = input_json['expenses']
 
     expenses_usd_sum = 0
+    supplies_expenses = 0
+    utilities_expense = 0
     for expense in expenses_list:
         exp_type = expense['type']
         exp_amt = expense['amount_usd']
+        
+        # get expenses that fall under "supplies" 
+        if exp_type in ['hotspot', 'hardware_equipment_other', 'antenna']:
+            supplies_expenses += exp_amt
+       
+        # get expenses that fall under "utilities"
+        if exp_type in ['internet']:
+            utilities_expense += exp_amt
+        
         expenses_usd_sum += exp_amt
         logger.debug(f"Expense: {exp_type} --> Amount: ${exp_amt}")
 
-    logger.info(f"Sum of all expenses: ${expenses_usd_sum}")
+    # Sum together claimable expenses for reporting, add to pdf data 
+    expenses_claim_sum = supplies_expenses + utilities_expense
+    tax_data['22'] = supplies_expenses
+    tax_data['25'] = utilities_expense
+    tax_data['28'] = expenses_claim_sum
+    logger.info(f"Sum of all claimable expenses: ${expenses_claim_sum}")
 
     # Subtract expense from rewards
-    taxable_earnings = rewards_usd - expenses_usd_sum
-    logger.info(f"Total taxable earnings for year {tax_year}: ${taxable_earnings}")
+    net_profit = rewards_usd - expenses_claim_sum
+    logger.info(f"Total taxable earnings for year {tax_year}: ${net_profit}")
+    tax_data['31'] = net_profit
+
+    # Write tax_data to pdf 
+    output_pdf = f"{firstname}_{lastname}_{tax_year}_1040sc.pdf"
+    logger.debug(f"Input dict for tax form: {tax_data}")
+    write_data_to_1040(output_pdf, tax_data)
+    
     
