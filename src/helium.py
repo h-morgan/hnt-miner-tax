@@ -94,7 +94,6 @@ def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev
             url_oracle = '/'.join([URL_ORACLE_BASE, str(block)])
             oracle_response = requests.get(url_oracle, headers=HEADERS)
             oracle_data = oracle_response.json()
-            print(oracle_data)
             
             # if we have data for this block, get the oracle price
             if 'data' in oracle_data:
@@ -103,7 +102,7 @@ def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev
             
             # if we get an error, handle it accordingly
             if 'error' in oracle_data:
-                logger.error(f"Error access data for block {block}, response from Helium = {oracle_data}")
+                logger.error(f"Error access data for block {block}, response from Helium: {oracle_data}")
                 block = block - 1
 
         # build list of elements to add to our final all_transactions list (later to be used to build our df)
