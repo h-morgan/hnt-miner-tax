@@ -1,7 +1,7 @@
 import pymysql
 from dotenv import load_dotenv
 import os
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine, MetaData, select
 import logging
 
 
@@ -19,3 +19,21 @@ hnt_db_engine = create_engine(f'postgresql://{HNT_DB_UN}:{HNT_DB_PW}@{HNT_DB_HOS
 # load metadata, to load table objects from hnt tax db
 hnt_metadata = MetaData(bind=hnt_db_engine)
 hnt_metadata.reflect()
+
+
+def get_new_csv_requests():
+
+    csv_table = hnt_metadata.tables['hnt_csv_requests']
+    stmt = select([csv_table.c.id, csv_table.c.wallet, csv_table.c.year]).where(csv_table.c.status == 'new')
+
+    # try to get new csv requests from db table
+    try:
+        new_requests = hnt_db_engine.execute(stmt)
+        new_records = new_requests.fetchall()
+
+    # if we get this error, it means we couldn't connect to hnttax database
+    except (psycopg2.OperationalError, sa.exc.OperationalError):
+        logger.error("Could not connect to HNTTAX database - TERMINATING")
+        sys.exit()
+
+    return new_records
