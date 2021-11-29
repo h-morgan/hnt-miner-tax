@@ -2,6 +2,8 @@ import requests
 import pandas as pd
 import json, time, random
 import logging
+
+from requests.api import head
 from utils import fill_pdf
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -10,6 +12,10 @@ logger = logging.getLogger(__name__)
 URL_ACCOUNTS_BASE = "https://api.helium.io/v1/accounts"
 URL_HOTSPOTS_BASE = "https://api.helium.io/v1/hotspots"
 URL_ORACLE_BASE = "https://api.helium.io/v1/oracle/prices"
+
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'# This is another valid field
+}
 
 
 def query_helium_cursor(cursor, base_trans_url, try_number=1):
@@ -21,14 +27,15 @@ def query_helium_cursor(cursor, base_trans_url, try_number=1):
     url_cursor = '&'.join([base_trans_url, f"cursor={cursor}"])
     
     try:
-        cursor_response = requests.get(url_cursor)
+        cursor_response = requests.get(url_cursor, headers=HEADERS)
+        status_code = cursor_response.status_code
         cursor_data = cursor_response.json()
     
-    except:
+    except Exception as e:
         logger.warn(f"Hit an error, trying to hit url again: {url_cursor}")
         time.sleep(2**try_number + random.random()*0.01) #exponential backoff
         return query_helium_cursor(cursor, base_trans_url, try_number=try_number+1)
-    
+
     num_data_entries = len(cursor_data['data'])
     logger.info(f"Retrieved cursor data, found {num_data_entries} new transactions")
     return cursor_data
@@ -38,16 +45,27 @@ def get_request(url, try_number=1):
     """
     Submits a GET request to the url specified, performs re-tries in the event of an error
     """
+    #try:
+    headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'# This is another valid field
+    }   
+
+    headers2 = {
+        "User-Agent": "im dumb"
+    }
     try:
-        res = requests.get(url)
+        logger.info(f"URL: {url}")
+        res = requests.get(url, headers=headers)
+        res.status_code
+        #print(res.status_code, res.text)
         res_data = res.json()
-    
+
     except Exception as e:
         logger.error(f"Error performing request, trying to hit url again: {url}")
         logger.error(f"Exception hit: {e}")
         time.sleep(2**try_number + random.random()*0.01) #exponential backoff
         return get_request(url, try_number=try_number+1)
-    
+
     return res_data
 
 
@@ -66,16 +84,27 @@ def get_transaction_data(cursor, base_trans_url, wallet_addr, hotspot_addr, prev
     for reward in cursor_data['data']:
         timestamp = reward['timestamp']
         hash = reward['hash']
-        block = reward['block']
+        this_block = reward['block']
         hnt_amt = reward['amount'] * (10 ** -8)
 
-        # get block price 
-        url_oracle = '/'.join([URL_ORACLE_BASE, str(block)])
-        oracle_response = requests.get(url_oracle)
-        oracle_data = oracle_response.json()
-
-        oracle_price = oracle_data['data']['price'] * (10 ** -8)
-        usd = oracle_price * hnt_amt
+        # get block price, if we can't get this block get the one before it
+        block = this_block
+        usd = None
+        while usd is None:
+            url_oracle = '/'.join([URL_ORACLE_BASE, str(block)])
+            oracle_response = requests.get(url_oracle, headers=HEADERS)
+            oracle_data = oracle_response.json()
+            print(oracle_data)
+            
+            # if we have data for this block, get the oracle price
+            if 'data' in oracle_data:
+                oracle_price = oracle_data['data']['price'] * (10 ** -8)
+                usd = oracle_price * hnt_amt
+            
+            # if we get an error, handle it accordingly
+            if 'error' in oracle_data:
+                logger.error(f"Error access data for block {block}, response from Helium = {oracle_data}")
+                block = block - 1
 
         # build list of elements to add to our final all_transactions list (later to be used to build our df)
         reward_record = [timestamp, wallet_addr, hotspot_addr, block, hnt_amt, oracle_price, usd, hash]
@@ -114,7 +143,6 @@ def get_helium_rewards(account, year, save_csv=False):
         # loop through each hotspot and get transactions for it
         url_query = f"rewards?max_time={year}-12-31&min_time={year}-01-01"
         url_transactions = '/'.join([URL_HOTSPOTS_BASE, hs_address, url_query])
-
         transaction_data = get_request(url_transactions)
         logger.info(f"Cursor: {transaction_data['cursor']}")
 
@@ -181,8 +209,8 @@ def compute_taxes(input_json):
     }
 
     # use tax year and helium wallet address to get rewards
-    #rewards_usd = get_helium_rewards(wallet_address, tax_year)
-    rewards_usd = 2400.00
+    rewards_usd = get_helium_rewards(wallet_address, tax_year)
+    #rewards_usd = 2400.00
     tax_data['1-line'] = rewards_usd
     tax_data['7'] = rewards_usd
 

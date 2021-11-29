@@ -3,29 +3,27 @@ from click.termui import prompt
 from helium import URL_ACCOUNTS_BASE, get_request, get_helium_rewards, compute_taxes
 import os
 import json
+from db import hntdb
 
 @click.group()
 def cli():
     pass
 
-'''
-@cli.command(name="csv")
-@click.option("--db/--id", default=True, help="process new requests from db (--db) or by manually providing account id (--id), default is db")
-def process_csv_requests(db):
+@cli.command(name="csv-db")
+def process_csv_requests():
     """
-    Cli entrypoint for processing csv requests
+    Cli entrypoint for processing csv requests from database
     """
     # if we're getting stuff from db, get the stuff
-    if db:
-        print('yes')
-'''
 
-@cli.command(name="csv2")
+
+
+@cli.command(name="csv-manual")
 @click.option("--account", prompt=True)
 @click.option("--year", prompt=True)
 def generate_rewards_csv(account, year):
     """
-    Generate a CSV output of a Helium wallet's total rewards
+    Generate a CSV output of a single Helium wallet's total rewards
     for a specified tax year. Saves csv
     """
 
