@@ -7,7 +7,7 @@ from loguru import logger
 from helium.service import HeliumClient
 from sqlalchemy.dialects.postgresql import insert as pinsert
 import pandas as pd
-
+from datetime import datetime
 
 
 def process_csv_requests(id=None):
@@ -39,7 +39,8 @@ def process_csv_requests(id=None):
             }
             update_values = {
                 "status": "error",
-                "errors": error_info
+                "errors": error_info,
+                "processed_at": datetime.utcnow()
             }
             error_stmt = csv_table.update().where(csv_table.c.id == row_id)
             hnt_db.execute(error_stmt, update_values)
@@ -81,15 +82,36 @@ def process_csv_requests(id=None):
             if all_rewards:
                 df = pd.DataFrame(all_rewards)
             
+                # TODO: save to aws s3
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all reward transactions for db id {row_id} from year {year} complete. Saving to csv.")
                 df.to_csv(f"{row_id}_{year}.csv")
 
                 # Once csv is compiled, we need the total in the USD column 
-                total_usd = round(df['usd'].sum(), 4)
+                total_usd = round(df['usd'].sum(), 3)
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Total usd income for year {year}: ${total_usd}") 
+
+                # update hnttax db for this request
+                update_success_values = {
+                    "status": "processed",
+                    "income": total_usd,
+                    "processed_at": datetime.utcnow()
+                }
+                update_success_stmt = csv_table.update().where(csv_table.c.id == row_id)
+                hnt_db.execute(update_success_stmt, update_success_values)
             
             else:
-                logger.warning(f"[{processor.HNT_SERVICE_NAME}] No reward transactions found for wallet {wallet} for year {year}")
+                msg = "No reward transactions found"
+                logger.warning(f"[{processor.HNT_SERVICE_NAME}] {msg} for wallet {wallet} for year {year}")
+                update_empty = {
+                    "status": "empty",
+                    "errors": {
+                        "msg": msg,
+                        "stage": "all hotspot reward collection for wallet - empty csv"
+                    },
+                    "processed_at": datetime.utcnow()
+                }
+                update_empty_stmt = csv_table.update().where(csv_table.c.id == row_id)
+                hnt_db.execute(update_empty_stmt, update_empty)
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new CSV requests")
 
