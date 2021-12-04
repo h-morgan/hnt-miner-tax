@@ -10,10 +10,10 @@ import pandas as pd
 
 
 
-def process_csv_requests(ids=None):
+def process_csv_requests(id=None):
     """
     Processes all new csv requests in hnttax db (status="new")
-    if ids given, takes in a list of db ids to run the csv processor for
+    if id given, takes in db id to run the csv processor for
     """
 
     processor = CsvProcessor()
@@ -92,8 +92,8 @@ def process_csv_requests(ids=None):
                 logger.warning(f"[{processor.HNT_SERVICE_NAME}] No reward transactions found for wallet {wallet} for year {year}")
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new CSV requests")
-                    
 
 
-
+def process_schc_requests(id):
+    pass
 
