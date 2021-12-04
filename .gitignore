@@ -2,3 +2,5 @@ venv/
 *.csv
 *.json
 .DS_Store
+*.env
+dev.py
