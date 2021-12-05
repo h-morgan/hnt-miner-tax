@@ -9,18 +9,18 @@ from loguru import logger
 def run(service, id):
 
     if service == "all":
-        process_csv_requests(id=id)
+        process_csv_requests(id_=id)
         process_schc_requests(id=id)
     
     elif service == "csv":
-        process_csv_requests(id=id)
+        process_csv_requests(id_=id)
 
     elif service == "schc":
         process_schc_requests(id=id)
 
     elif service == "test":
         logger.info("Running in test mode")
-        process_csv_requests(id=id)
+        process_csv_requests(id_=id)
     
     else:
         logger.warn("Incompatible service requested. Please fetch csv, schc, or both.")

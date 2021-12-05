@@ -36,6 +36,13 @@ class BaseProcessor:
 
         return select_stmt
 
+    def get_row_by_id(self, id_):
+        hnt_table = hnt_metadata.tables[self.HNT_DB_TABLE_NAME]
+        select_stmt = select([hnt_table]).where(hnt_table.c.id == id_)
+
+        row = hnt_db_engine.execute(select_stmt).fetchone()
+        return row
+
     def _get_rows_batch(self):
         """
         Query the hnttax db in batches of self.batch_size, yield whole batch,
@@ -77,10 +84,17 @@ class BaseProcessor:
         """
         pass
 
-    def get_forms(self):
+    def get_forms(self, id_):
         """
         Calls _get_rows method to get rows one by one, then calls _transform_row
         method to transform each row into required payload format for hnt db
         """
-        for row in self._get_rows():
+        # if given an id, bypass the normal _get_rows method and just get our single row
+        if id_:
+            row = self.get_row_by_id(id_)
             yield self._transform_row(row)
+        
+        # otherwise run in normal mode
+        else:
+            for row in self._get_rows():
+                yield self._transform_row(row)

@@ -10,7 +10,7 @@ import pandas as pd
 from datetime import datetime
 
 
-def process_csv_requests(id=None):
+def process_csv_requests(id_=None):
     """
     Processes all new csv requests in hnttax db (status="new")
     if id given, takes in db id to run the csv processor for
@@ -22,7 +22,7 @@ def process_csv_requests(id=None):
     csv_table = hnt_metadata.tables[processor.HNT_DB_TABLE_NAME]
 
     # loop over new form entries 1 by 1, and run the csv-creation code
-    for form in processor.get_forms():
+    for form in processor.get_forms(id_=id_):
         
         row_id = form['id']
         wallet = form['wallet']
