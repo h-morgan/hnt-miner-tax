@@ -1,5 +1,4 @@
 from controllers.ProcessController import process_csv_requests, process_schc_requests
-from aws import save_df_to_s3
 import click
 from loguru import logger
 
@@ -21,9 +20,7 @@ def run(service, id):
 
     elif service == "test":
         logger.info("Running in test mode")
-        save_df_to_s3('df')
         
-    
     else:
         logger.warn("Incompatible service requested. Please fetch csv, schc, or both.")
 
