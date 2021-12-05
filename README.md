@@ -1,19 +1,19 @@
-# Helium Miner Tax Tool 
+# hntTax - HNT Rewards and Schedule C Compiler
 
 This tool is a cli tool that can be run to determine a Helium miner's rewards income in USD for a requested tax year. 
 
-Once initial setup is complete, to run the tool you need to give it a user's Helium wallet address and the tax year of interest. Additional instructions are included below.
-
 ## Table of Contents
 - [1. Setup](#1-setup)
+  - [Initial repo setup](#initial-repo-setup)
+  - [Environment variables](#environment-variables)
 - [2. How to run](#2-how-to-run)
-  - [A. Generate Helium Rewards CSV](#a-generate-helium-rewards-csv)
-    - [CLI Arguments](#cli-arguments)
-    - [Input Arguments](#input-arguments)
-    - [CSV Output](#csv-output)
-  - [B. Compute Taxes for a Client](#b-compute-taxes-for-a-client)
+  - [Process CSV Requests](#process-csv-requests)
+  - [Process Schedule C Requests](#process-schedule-c-requests)
+- [OLD SECTIONS](#old-sections-keeping-for-now-in-case-needed)
 
 ## 1. Setup 
+
+### Initial repo setup
 
 First, clone the repository onto your machine:
 ```bash
@@ -37,17 +37,54 @@ pip install -r requirements.txt
 ```
 Note: you will only need to intialize a venv and install the required packages one time upon setup. From here on out, you will only need to ensure the venv is activated and you will be able to run the tool.
 
+### Environment variables
+
+Next you'll need to create an `.env` file in the root of this repository, with the following enviroment variables:
+
+```
+HNTTAX_DATABASE_HOST=host
+HNTTAX_DATABASE_PORT=5432
+HNTTAX_DATABASE_UN=user
+HNTTAX_DATABASE_PW=password
+HNTTAX_DATABASE_NAME=hnttax
+
+HELIUM_API_URL=https://api.helium.io/v1/
+```
+
 ## 2. How to run
+
+To run this service, navigate to the `src/` directory. From here, you can use the service's cli tool with varying commands as needed. 
+
+Note: make sure you are running this from the activated virtual environment described above, with all required packages installed.
+
+### Process CSV Requests
+
+To run this service and generate CSV's for all new CSV requests in our hnttax database (all rows in the `hnt_csv_requests` table with `status=new`):
+
+```
+python process.py -s csv
+```
+
+To run this service for a given row id in our database `hnt_csv_requests` table:
+
+```
+python process.py -s csv --id <id>
+```
+
+This will update the database columns (`processed_at`, `status`, `income`, and `errors`) and will save a CSV output for each request (where a valid CSV could be generated) into our AWS S3 bucket.
+
+<hr>
+
+## OLD SECTIONS (KEEPING FOR NOW IN CASE NEEDED)
+
 There are 2 possible ways to run the cli tool (see their respective sections for more info) - 
 
-[a](#a-generate-helium-rewards-csv) - generate the USD sum of all Helium rewards given a Helium wallet address and a tax year, as well as a CSV output of all transactions
+[a](#a-generate-helium-rewards-csv) - generate the USD sum of all Helium rewards for given wallet address(es) and tax year, as well as a CSV output of all transactions
 
-[b](#b-compute-taxes-for-a-client) - compute taxes for a client given an input json file
+[b](#b-compute-taxes-for-a-client) - generate a Schedule C form for a client given a json file
 
-You can pass the required information as arguments to the cli tool one of two ways: via cli arguments, or input arguments.
 
 ### A. Generate Helium Rewards CSV
-
 
 #### CLI Arguments
 
