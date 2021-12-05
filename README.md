@@ -73,6 +73,10 @@ python process.py -s csv --id <id>
 
 This will update the database columns (`processed_at`, `status`, `income`, and `errors`) and will save a CSV output for each request (where a valid CSV could be generated) into our AWS S3 bucket.
 
+### Process Schedule C Requests
+
+This process is still in development.
+
 <hr>
 
 ## OLD SECTIONS (KEEPING FOR NOW IN CASE NEEDED)
