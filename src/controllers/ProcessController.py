@@ -1,5 +1,3 @@
-import re
-import click
 from processors.CsvProcessor import CsvProcessor
 from db.hntdb import hnt_db_engine as hnt_db
 from db.hntdb import hnt_metadata
@@ -7,6 +5,7 @@ from loguru import logger
 from helium.service import HeliumClient
 from sqlalchemy.dialects.postgresql import insert as pinsert
 import pandas as pd
+from aws import save_df_to_s3
 from datetime import datetime
 
 
@@ -82,9 +81,9 @@ def process_csv_requests(id_=None):
             if all_rewards:
                 df = pd.DataFrame(all_rewards)
             
-                # TODO: save to aws s3
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all reward transactions for db id {row_id} from year {year} complete. Saving to csv.")
-                df.to_csv(f"{row_id}_{year}.csv")
+                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
+                file_name = f"{row_id}_{year}_{wallet[0:5]}.csv"
+                save_df_to_s3(df, request_type='csv', file_year=year, file_name=file_name)
 
                 # Once csv is compiled, we need the total in the USD column 
                 total_usd = round(df['usd'].sum(), 3)
