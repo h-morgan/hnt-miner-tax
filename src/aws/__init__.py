@@ -10,7 +10,7 @@ SAVE_MAP = {
 
 
 def save_df_to_s3(df, request_type='csv', file_year=2021, file_name='test.csv'):
-    "save a given df to s3. type can either be csv, or sched"
+    "save a given df to s3. type can either be csv, or schc"
 
     # build file path to save df to, given args
     saved_file = f"{SAVE_MAP[request_type]}/{file_year}/{file_name}"
