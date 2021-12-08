@@ -1,12 +1,17 @@
 from controllers.ProcessController import process_csv_requests, process_schc_requests
 import click
 from loguru import logger
+import sys
 
 
 @click.command()
 @click.option("--service", '-s', default='csv', type=click.Choice(["csv", "schc", "all", "test"]))
 @click.option("--id", default=None)
-def run(service, id):
+@click.option("--log_level", '-l',  default="INFO", type=click.Choice(("INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"), case_sensitive=False))
+def run(service, id, log_level):
+    logger.remove()
+    logger.add(sys.stderr, level=log_level.upper())
+
 
     if service == "all":
         process_csv_requests(id_=id)
