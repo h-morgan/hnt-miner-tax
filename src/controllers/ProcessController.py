@@ -29,8 +29,9 @@ def process_csv_requests(id_=None):
 
         valid_wallet = client.validate_wallet(form['wallet'])
 
+        # TODO: fix valid wallet checking  
         # if we didn't get a valid wallet address, we log the error, write the message to the db, and continue on to next form
-        if valid_wallet is None:
+        if valid_wallet == -1:
             logger.error(f"[{processor.HNT_SERVICE_NAME}] invalid helium wallet address for db id: {row_id}")
             error_info = {
                 "msg": "wallet not found on Helium blockchain/no wallet data",
