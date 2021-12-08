@@ -9,6 +9,8 @@ This tool is a cli tool that can be run to determine a Helium miner's rewards in
 - [2. How to run](#2-how-to-run)
   - [Process CSV Requests](#process-csv-requests)
   - [Process Schedule C Requests](#process-schedule-c-requests)
+- [3. AWS](#aws)
+  - [Updating AWS ECR image](#updating-aws-ecr-image)
 - [OLD SECTIONS](#old-sections-keeping-for-now-in-case-needed)
 
 ## 1. Setup 
@@ -76,6 +78,19 @@ This will update the database columns (`processed_at`, `status`, `income`, and `
 ### Process Schedule C Requests
 
 This process is still in development.
+
+## AWS
+
+This service is meant to run in production as tasks in AWS containers. For more info on how we define and provision containers in AWS to run tasks, see this [hntTax Google doc](https://docs.google.com/document/d/1OQaZ1h---u0dqlE_gmk0jjOhQ7R5jFZjhOjNi4OLvxQ/edit#).
+
+### Updating AWS ECR image
+Any time this repo is updated/any code changes are made, in order for those changes to be reflected in the tasks run in aws, the ECR image needs to updated. 
+
+This process can be done by running the script to build the new image, tag it, and push to AWS:
+
+```
+./prod-upload.sh
+```
 
 <hr>
 
