@@ -48,10 +48,12 @@ class HeliumClient:
 
         # make request, raise exceptions if they come up
         resp = self._session.get(url, headers=self.HEADERS)
+        logger.debug(f"[{self.service_name}] valid wallet check url: {url}")
         resp.raise_for_status()
 
         # load response body
         wallet_data = resp.json()
+        logger.debug(f"[{self.service_name}] valid wallet response body: {wallet_data}")
         
         # get block value of account - this is the block the wallet was recorded on
         block = wallet_data['data']['block']
