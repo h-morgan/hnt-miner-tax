@@ -39,6 +39,7 @@ class BaseProcessor:
     def get_row_by_id(self, id_):
         hnt_table = hnt_metadata.tables[self.HNT_DB_TABLE_NAME]
         select_stmt = select([hnt_table]).where(hnt_table.c.id == id_)
+        logger.debug(f"[{self.HNT_SERVICE_NAME}] fetching ID: {id_}, {select_stmt}")
 
         row = hnt_db_engine.execute(select_stmt).fetchone()
         return row
