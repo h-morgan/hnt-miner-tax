@@ -53,12 +53,48 @@ class HeliumClient:
 
         # load response body
         wallet_data = resp.json()
-        logger.debug(f"[{self.service_name}] valid wallet response body: {wallet_data}")
+        logger.debug(f"[{self.service_name}] validate wallet response body: {wallet_data}")
         
         # get block value of account - this is the block the wallet was recorded on
         block = wallet_data['data']['block']
 
-        return block
+        # if block value is None, check to see if this is actually a hotspot address, 
+        # if so get the associated wallet ("owner") in Helium api response
+        if block is None:
+            logger.warning(f"[{self.service_name}] wallet addr not found in blockchain, checking if hotspot addr")
+            
+            valid_wallet = self._get_valid_wallet_from_hotpost(wallet_addr)
+
+        else:
+            valid_wallet = wallet_addr
+
+        return valid_wallet
+
+    def _get_valid_wallet_from_hotpost(self, hotspot_address):
+        # build url to hit in helium with given wallet address
+        url = self.URL_HOTSPOTS_BASE + f'/{hotspot_address}'
+
+        # make request, raise exceptions if they come up
+        try:
+            resp = self._session.get(url, headers=self.HEADERS)
+            logger.debug(f"[{self.service_name}] validate hotspot check url: {url}")
+
+            # load response body
+            hotspot_data = resp.json()
+            logger.debug(f"[{self.service_name}] validate hotspot response body: {hotspot_data}")
+        
+            # if we received a valid response, it will have a "data" key
+            if "data" in hotspot_data:
+                wallet_addr = hotspot_data['data']['owner']
+                logger.info(f"[{self.service_name}] hotspot address provided - found valid wallet for hotspot ({wallet_addr})")
+                return wallet_addr
+
+            if "error" in hotspot_data:
+                logger.error(f"[{self.service_name}] invalid wallet address given was not a hotspot address")
+        
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[{self.service_name}] invalid wallet address given was not a hotspot address ({e})")
+        
 
     def get_hotspots_for_wallet(self, wallet_addr):
         
@@ -77,7 +113,7 @@ class HeliumClient:
 
     def get_hotspot_rewards(self, year, hotspot_addr):
 
-        url_query = f"rewards?max_time={year}-12-31&min_time={year}-01-01"
+        url_query = f"rewards?max_time={year}-12-31&min_time={year}-11-01"
     
         next_cursor = None
 
