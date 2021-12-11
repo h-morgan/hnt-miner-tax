@@ -29,9 +29,17 @@ def process_csv_requests(id_=None):
 
         valid_wallet = client.validate_wallet(form['wallet'])
 
-        # TODO: fix valid wallet checking  
+        # if the valid wallet returned from validation is different from db value, update db
+        if valid_wallet is not None and valid_wallet != wallet:
+            logger.info(f"[{processor.HNT_SERVICE_NAME}] updating helium wallet address in db - hotspot address provided")
+            update_wallet_values = {
+                "wallet": valid_wallet
+            }
+            update_wallet_stmt = csv_table.update().where(csv_table.c.id == row_id)
+            hnt_db.execute(update_wallet_stmt, update_wallet_values)
+ 
         # if we didn't get a valid wallet address, we log the error, write the message to the db, and continue on to next form
-        if valid_wallet == -1:
+        if valid_wallet is None:
             logger.error(f"[{processor.HNT_SERVICE_NAME}] invalid helium wallet address for db id: {row_id}")
             error_info = {
                 "msg": "wallet not found on Helium blockchain/no wallet data",
@@ -47,22 +55,25 @@ def process_csv_requests(id_=None):
         
         # otherwise, process the csv request
         else:
-            logger.info(f"[{processor.HNT_SERVICE_NAME}] valid wallet found on Helium blockchain, processing request for tax year {year}, wallet: {wallet}")
+            logger.info(f"[{processor.HNT_SERVICE_NAME}] valid wallet found on Helium blockchain, processing request for tax year {year}, wallet: {valid_wallet}")
 
             # get all hotspots associated with this wallet
-            hotspots = client.get_hotspots_for_wallet(wallet)
-            logger.info(f"[{processor.HNT_SERVICE_NAME}] num hotspots associated with this address: {len(hotspots['data'])}")
+            hotspots = client.get_hotspots_for_wallet(valid_wallet)
+            num_hotspots = len(hotspots['data'])
+            logger.info(f"[{processor.HNT_SERVICE_NAME}] num hotspots associated with this address: {num_hotspots}")
             
             all_rewards = []
+            x = 1
             # loop through each hotpost and compile list of all transactions associated with this wallet
             for hotspot in hotspots['data']:
+                logger.info(f"[{processor.HNT_SERVICE_NAME}] hotspot {x} of {num_hotspots}")
                 hotspot_addr = hotspot['address']
                 hotspot_state = hotspot['geocode']['short_state']
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] retrieving hotspot reward activity for hotspot: {hotspot_addr}")
 
                 # collect hotspot-level attributes that are written to csv
                 hotspot_attr = {
-                    "wallet": wallet,
+                    "wallet": valid_wallet,
                     "hotspot_address": hotspot_addr,
                     "state": hotspot_state
                 }
@@ -78,12 +89,15 @@ def process_csv_requests(id_=None):
                     }
                     all_rewards.append(complete_row)
 
+                # increment the hotspot counter, for logging
+                x += 1
+
             # once all rewards are collected for a wallet, convert to dataframe and save to csv
             if all_rewards:
                 df = pd.DataFrame(all_rewards)
             
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
-                file_name = f"{row_id}_{year}_{wallet[0:5]}.csv"
+                file_name = f"{row_id}_{year}_{valid_wallet[0:7]}.csv"
                 save_df_to_s3(df, request_type='csv', file_year=year, file_name=file_name)
 
                 # Once csv is compiled, we need the total in the USD column 
@@ -101,7 +115,7 @@ def process_csv_requests(id_=None):
             
             else:
                 msg = "No reward transactions found"
-                logger.warning(f"[{processor.HNT_SERVICE_NAME}] {msg} for wallet {wallet} for year {year}")
+                logger.warning(f"[{processor.HNT_SERVICE_NAME}] {msg} for wallet {valid_wallet} for year {year}")
                 update_empty = {
                     "status": "empty",
                     "errors": {
