@@ -30,7 +30,7 @@ class HeliumClient:
         self.base_url = base_url or os.getenv("HELIUM_API_URL")
 
         session = requests.Session()
-        retry = Retry(total=5, backoff_factor=0.1, status_forcelist=(500, 502, 504, 429))
+        retry = Retry(total=25, backoff_factor=0.1, status_forcelist=(500, 502, 503, 504, 429))
         adapter = HTTPAdapter(max_retries=retry)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
