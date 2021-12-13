@@ -108,7 +108,8 @@ def process_csv_requests(id_=None):
                 update_success_values = {
                     "status": "processed",
                     "income": total_usd,
-                    "processed_at": datetime.utcnow()
+                    "processed_at": datetime.utcnow(),
+                    "num_hotspots": num_hotspots,
                 }
                 update_success_stmt = csv_table.update().where(csv_table.c.id == row_id)
                 hnt_db.execute(update_success_stmt, update_success_values)
@@ -122,7 +123,8 @@ def process_csv_requests(id_=None):
                         "msg": msg,
                         "stage": "all hotspot reward collection for wallet - empty csv"
                     },
-                    "processed_at": datetime.utcnow()
+                    "processed_at": datetime.utcnow(),
+                    "num_hotspots": num_hotspots,
                 }
                 update_empty_stmt = csv_table.update().where(csv_table.c.id == row_id)
                 hnt_db.execute(update_empty_stmt, update_empty)
