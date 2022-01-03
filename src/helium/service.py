@@ -114,7 +114,8 @@ class HeliumClient:
 
     def get_hotspot_rewards(self, year, hotspot_addr):
 
-        url_query = f"rewards?max_time={year}-12-31&min_time={year}-01-01"
+        next_year = str(int(year) + 1)
+        url_query = f"rewards?max_time={next_year}-01-01&min_time={year}-01-01"
     
         next_cursor = None
 
