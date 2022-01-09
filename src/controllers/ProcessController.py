@@ -11,6 +11,14 @@ from datetime import datetime
 from taxes.taxes import write_schc
 
 
+# key for determining service level for schc processing
+SERVICE_KEY = {
+    "single_state": 1,
+    "single_state_mult_miners": 2,
+    "mult_state_mult_miners": 3
+}
+
+
 def process_csv_requests(id_=None):
     """
     Processes all new csv requests in hnttax db (status="new")
@@ -153,6 +161,7 @@ def process_schc_requests(id_=None):
         year = form['year']
         tax_data = form['tax_data']
 
+        ## STEP 1 - WALLET VALIDATION
         valid_wallet = client.validate_wallet(form['wallet'])
 
         # if the valid wallet returned from validation is different from db value, update db
@@ -190,21 +199,34 @@ def process_schc_requests(id_=None):
             processed_at = None
             num_hotspots = None
             hotspot_locations = None
+            service_level = None
 
             logger.info(f"[{processor.HNT_SERVICE_NAME}] valid wallet found on Helium blockchain, processing request for tax year {year}, wallet: {valid_wallet}")
 
-            # get all hotspots associated with this wallet
+            ## STEP 2 - get all hotspots associated with this wallet
             hotspots = client.get_hotspots_for_wallet(valid_wallet)
             num_hotspots = len(hotspots['data'])
             logger.info(f"[{processor.HNT_SERVICE_NAME}] num hotspots associated with this address: {num_hotspots}")
 
+            ## STEP 3 - hotspot location data and service level determination
             # get and store the state (location data) for each hotspot, using hotspot data retrieved in prior step
             hotspot_locations, is_single_state, location_errors = client.get_hotspot_state_locations(hotspots)
             if location_errors:
                 errors['hotspot_locations'] = location_errors
 
             # now we have num hotspots and num unique states, determine service level
+            # if we have 1 (or none, maybe not setup yet) hotspots, service level = 1
+            if num_hotspots <= 1:
+                service_level = SERVICE_KEY["single_state"]
             
+            # more than 1 hotspot, but all in one state
+            if num_hotspots > 1 and is_single_state:
+                service_level = SERVICE_KEY["single_state_mult_miners"]
+
+            elif num_hotspots > 1 and not is_single_state:
+                service_level = SERVICE_KEY["single_state_mult_miners"]
+            
+            ## STEP 4 - compile csv rewards summary
             all_rewards = []
             x = 1
             # loop through each hotpost and compile list of all transactions associated with this wallet
@@ -252,39 +274,33 @@ def process_schc_requests(id_=None):
                 num_hotspots = num_hotspots
                 status = "processed"
 
-                '''
-                update_success_values = {
-                    "status": "processed",
-                    "income": total_usd,
-                    "processed_at": datetime.utcnow(),
-                    "num_hotspots": num_hotspots,
-                }
-                update_success_stmt = schc_table.update().where(schc_table.c.id == row_id)
-                hnt_db.execute(update_success_stmt, update_success_values)
-                '''
-
             # if they had no mining rewards, log status as empty but still might have expenses, so still make schedc file
             else:
                 msg = "No reward transactions found"
                 logger.warning(f"[{processor.HNT_SERVICE_NAME}] {msg} for wallet {valid_wallet} for year {year}")
-                status = "empty"
-                
-                '''
-                update_empty = {
-                    "status": "empty",
-                    "errors": {
-                        "msg": msg,
-                        "stage": "all hotspot reward collection for wallet - empty csv"
-                    },
-                    "processed_at": datetime.utcnow(),
-                    "num_hotspots": num_hotspots,
+                status = "processed_no_rewards"
+                errors["no_rewards"] = {
+                    "msg": msg,
+                    "stage": "all hotspot reward collection for wallet - empty csv"
                 }
-                update_empty_stmt = schc_table.update().where(schc_table.c.id == row_id)
-                hnt_db.execute(update_empty_stmt, update_empty)
-                '''
             
+            ## STEP 5 - create PDF schedule c form
             # either way, we want to create a schedule c form for this person, they may have expenses
             write_schc(income, tax_data)
+
+            ## STEP 6 - update values in the database
+            processed_at = datetime.utcnow()
+            update_vals = {
+                "status": status,
+                "errors": errors,
+                "income": income,
+                "processsed_at": processed_at,
+                "num_hotspots": num_hotspots,
+                "hotspot_locations": hotspot_locations,
+                "service": service_level
+            }
+            update_stmt = schc_table.update().where(schc_table.c.id == row_id)
+            hnt_db.execute(update_stmt, update_vals)
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new schedule c requests")
 
