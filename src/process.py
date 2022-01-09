@@ -15,13 +15,13 @@ def run(service, id, log_level):
 
     if service == "all":
         process_csv_requests(id_=id)
-        process_schc_requests(id=id)
+        process_schc_requests(id_=id)
     
     elif service == "csv":
         process_csv_requests(id_=id)
 
     elif service == "schc":
-        process_schc_requests(id=id)
+        process_schc_requests(id_=id)
 
     elif service == "test":
         logger.info("Running in test mode")
