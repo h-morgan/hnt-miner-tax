@@ -1,6 +1,6 @@
 import click
 from click.termui import prompt
-from helium import URL_ACCOUNTS_BASE, get_request, get_helium_rewards, compute_taxes
+from taxes.taxes import URL_ACCOUNTS_BASE, get_request, get_helium_rewards, compute_taxes
 import os
 import json
 from db.hntdb import get_new_csv_requests
