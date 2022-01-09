@@ -9,6 +9,7 @@ import pandas as pd
 from aws import save_df_to_s3
 from datetime import datetime
 from taxes.taxes import write_schc
+from taxes.utils import collect_flags
 
 
 # key for determining service level for schc processing
@@ -210,9 +211,7 @@ def process_schc_requests(id_=None):
 
             ## STEP 3 - hotspot location data and service level determination
             # get and store the state (location data) for each hotspot, using hotspot data retrieved in prior step
-            hotspot_locations, is_single_state, location_errors = client.get_hotspot_state_locations(hotspots)
-            if location_errors:
-                errors['hotspot_locations'] = location_errors
+            hotspot_locations, is_single_state, non_us_location = client.get_hotspot_state_locations(hotspots)
 
             # now we have num hotspots and num unique states, determine service level
             # if we have 1 (or none, maybe not setup yet) hotspots, service level = 1
@@ -284,7 +283,12 @@ def process_schc_requests(id_=None):
                     "stage": "all hotspot reward collection for wallet - empty csv"
                 }
             
-            ## STEP 5 - create PDF schedule c form
+            ## STEP 5 - collect flags from tax form 
+            flags = collect_flags(tax_data)
+            if non_us_location:
+                flags["non_us_hotspot"] = True
+            
+            ## STEP 6 - create PDF schedule c form 
             # either way, we want to create a schedule c form for this person, they may have expenses
             write_schc(income, tax_data)
 
@@ -294,10 +298,11 @@ def process_schc_requests(id_=None):
                 "status": status,
                 "errors": errors,
                 "income": income,
-                "processsed_at": processed_at,
+                "processed_at": processed_at,
                 "num_hotspots": num_hotspots,
                 "hotspot_locations": hotspot_locations,
-                "service": service_level
+                "service": service_level,
+                "flags": flags
             }
             update_stmt = schc_table.update().where(schc_table.c.id == row_id)
             hnt_db.execute(update_stmt, update_vals)
