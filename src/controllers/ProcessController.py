@@ -199,9 +199,11 @@ def process_schc_requests(id_=None):
             logger.info(f"[{processor.HNT_SERVICE_NAME}] num hotspots associated with this address: {num_hotspots}")
 
             # get and store the state (location data) for each hotspot, using hotspot data retrieved in prior step
-            hotspot_locations, location_errors = client.get_hotspot_state_locations(hotspots)
+            hotspot_locations, is_single_state, location_errors = client.get_hotspot_state_locations(hotspots)
             if location_errors:
                 errors['hotspot_locations'] = location_errors
+
+            # now we have num hotspots and num unique states, determine service level
             
             all_rewards = []
             x = 1
