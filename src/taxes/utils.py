@@ -1,3 +1,4 @@
+from typing import no_type_check
 import pdfrw
 
 ANNOT_KEY = '/Annots'
@@ -45,3 +46,30 @@ def fill_pdf(input_pdf_path, output_pdf_path, data_dict):
     template_pdf.Root.AcroForm.update(pdfrw.PdfDict(NeedAppearances=pdfrw.PdfObject('true')))  # NEW
     pdfrw.PdfWriter().write(output_pdf_path, template_pdf)
 
+
+def collect_flags(tax_form):
+    """
+    Take user-provided form answers and write flags to a dict
+    """
+    flags = {}
+    no_values = ["", "no", "No", "NO"]
+
+    if tax_form['person_moved_states'] not in no_values:
+        flags["person_moved_states"] = True
+
+    if tax_form['hotspot_moved_states'] not in no_values:
+        flags["hotspot_moved_states"] = True
+
+    if tax_form["llc"]["has_llc"] not in no_values:
+        flags["has_llc"] = True
+    
+    if tax_form["llc"]["single_member"] in ("no", "No"):
+        flags["multi_member_llc"] = True
+
+    if tax_form["expenses"]["professional_install"]["type"] == "Independent contractor" and float(tax_form["expenses"]["professional_install"]["cost"]) > 600:
+        flags["independent_contractor_over_600"] = True
+
+    if tax_form["expenses"]["other_expenses"]["bool"] not in no_values:
+        flags["other_unclaimed_expenses"] = True
+    
+    return flags
