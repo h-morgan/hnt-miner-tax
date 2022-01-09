@@ -112,10 +112,41 @@ class HeliumClient:
         return wallet_data
 
 
+    def get_hotspot_state_locations(self, hotspots_data):
+        """
+        Takes in response from wallet/:addr/hotspots request and parses data
+        to compile list of states where hotspots are located
+        """
+        all_hotspot_locations = []
+        errors = None
+
+        if not hotspots_data['data']:
+            logger.warning(f"No hotspots found for this wallet. Hotspot data: {hotspots_data}")
+        
+        else:
+            for hotspot in hotspots_data['data']:
+                hotspot_country = hotspot['geocode']['short_country']
+                if hotspot_country != 'US':
+                    logger.warning("Non-US country detected in hotspot locations")
+                    errors = {
+                        "msg": f"Non-US country detected in hotspot locations: [{hotspot_country}]",
+                        "stage": "hotspot location validation"
+                    }
+                
+                all_hotspot_locations.append({
+                    "hotspot_name": hotspot['name'],
+                    "hotspot_country": hotspot['geocode']['short_country'],
+                    "hotspot_state": hotspot['geocode']['short_state'],
+                    "hotspot_city": hotspot['geocode']['short_city']
+                })
+        
+        return all_hotspot_locations, errors
+
+
     def get_hotspot_rewards(self, year, hotspot_addr):
 
         next_year = str(int(year) + 1)
-        url_query = f"rewards?max_time={next_year}-01-01&min_time={year}-01-01"
+        url_query = f"rewards?max_time={next_year}-01-01&min_time={year}-01-01" # should be 01-01
     
         next_cursor = None
 
