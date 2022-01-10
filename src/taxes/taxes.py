@@ -3,6 +3,7 @@ from loguru import logger
 
 from requests.api import head
 from taxes.utils import fill_pdf
+from aws import save_1040_to_s3
 
 
 def write_data_to_1040(output_filename, data):
@@ -23,9 +24,10 @@ def write_data_to_1040(output_filename, data):
 
     logger.info(f"Saving completed 1040 schedule c for to: {output_file}")
     fill_pdf(pdf_file, output_file, fillable_data)
+    return output_file
 
 
-def write_schc(income, input_json):
+def write_schc(income, input_json, dbid):
     """
     Takes in input data in json format, calls get_helium_rewards and performs steps to fill pdf
     """
@@ -81,6 +83,11 @@ def write_schc(income, input_json):
     name_no_space = name.replace(" ", "_")
     output_pdf = f"{name_no_space}_{tax_year}_1040sc.pdf"
     logger.debug(f"Input dict for tax form: {tax_data}")
-    write_data_to_1040(output_pdf, tax_data)
+    local_file = write_data_to_1040(output_pdf, tax_data)
+
+    # save to aws s3
+    aws_filename = f"{dbid}/{output_pdf}"
+    save_1040_to_s3(local_file, file_year=tax_year, aws_file_name=aws_filename)
+
     
     

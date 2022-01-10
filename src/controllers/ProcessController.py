@@ -290,9 +290,11 @@ def process_schc_requests(id_=None):
             
             ## STEP 6 - create PDF schedule c form 
             # either way, we want to create a schedule c form for this person, they may have expenses
-            write_schc(income, tax_data)
+            write_schc(income, tax_data, dbid=row_id)
 
-            ## STEP 6 - update values in the database
+            ## STEP 7 - move receipts from hnttax server to aws s3
+
+            ## STEP 8 - update values in the database
             processed_at = datetime.utcnow()
             update_vals = {
                 "status": status,
