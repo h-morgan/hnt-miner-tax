@@ -72,4 +72,8 @@ def collect_flags(tax_form):
     if tax_form["expenses"]["other_expenses"]["bool"] not in no_values:
         flags["other_unclaimed_expenses"] = True
     
+    if tax_form["expenses"]["hosting"]["had_hosts"] not in no_values:
+        if tax_form["expenses"]["hosting"]["payment_currency"] == "HNT":
+            flags['paid_hosts_hnt'] = True
+
     return flags
