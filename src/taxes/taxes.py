@@ -131,7 +131,7 @@ def write_schc(income, input_json, dbid):
             if expense_info['payment_currency'] == 'USD':
                 contract_labor += float(expense_info['usd_paid'])
                 logger.debug(f"Expense: {exp_type} --> Amount: ${expense_info['usd_paid']}")
-            else:
+            elif expense_info['payment_currency'] == 'HNT':
                 logger.warning(f"Host paid in non-USD currency (id: {dbid} - {name}, {tax_year})")
 
     # PART 2 - now that we have all expenses organized - categorize to schc fields
