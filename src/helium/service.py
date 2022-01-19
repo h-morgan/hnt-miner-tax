@@ -119,8 +119,7 @@ class HeliumClient:
         """
         all_hotspot_locations = []
         states = []
-        errors = None
-        same_state = True
+        non_usd_location = False
 
         if not hotspots_data['data']:
             logger.warning(f"No hotspots found for this wallet. Hotspot data: {hotspots_data}")
@@ -128,23 +127,20 @@ class HeliumClient:
         else:
             for hotspot in hotspots_data['data']:
                 hotspot_country = hotspot['geocode']['short_country']
-                hotspot_state = hotspot['geocode']['short_state'],
+                hotspot_state = hotspot['geocode']['short_state']
                 if hotspot_country != 'US':
                     logger.warning("Non-US country detected in hotspot locations")
-                    errors = {
-                        "msg": f"Non-US country detected in hotspot locations: [{hotspot_country}]",
-                        "stage": "hotspot location validation"
-                    }
+                    non_usd_location = True
                 
                 all_hotspot_locations.append({
                     "hotspot_name": hotspot['name'],
                     "hotspot_country": hotspot_country,
-                    "hotspot_state": hotspot_state,
+                    "hotspot_state": hotspot['geocode']['short_state'],
                     "hotspot_city": hotspot['geocode']['short_city']
                 })
 
                 # keep track of JUST states, to see if they're all unique
-                states.append()
+                states.append(hotspot_state)
         
         if states:
             is_single_state = all(state == states[0] for state in states)
@@ -152,7 +148,7 @@ class HeliumClient:
         else:
             is_single_state = True
         
-        return all_hotspot_locations, is_single_state, errors
+        return all_hotspot_locations, is_single_state, non_usd_location
 
 
     def get_hotspot_rewards(self, year, hotspot_addr):
