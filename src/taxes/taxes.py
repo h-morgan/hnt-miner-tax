@@ -5,6 +5,26 @@ from requests.api import head
 from taxes.utils import fill_pdf
 from aws import save_1040_to_s3
 
+# expense categories, these are lists of keys of the dict keys in the expense dict in tax_data col in db table
+# the map is in the reformat.json file in hnttax_form_fetch/config
+SUPPLIES_EXPENSES = ["hotspot", "outdoor_bundle_kits", "antenna", "poe_injector", "coax_cable", 
+                     "grounding_equipment", "ethernet_cables", "solar_equipment", "other_equipment",
+                     "hardware_wallet", "validator_equipment"
+                    ]
+
+UTILITIES_EXPENSES = ["internet", "cell_phone", "validator_utilities"]
+
+LABOR_EXPENSES = ["professional_install"]
+
+TRAVEL_EXPENSES = ["travel"]
+
+BUSINESS_EXPENSES = ["business_property"]
+
+OFFICE_EXPENSES = ["office_expenses"]
+
+# 2020 mileage rate 
+MILEAGE_RATE = 0.575
+
 
 def write_data_to_1040(output_filename, data):
     """
@@ -48,29 +68,83 @@ def write_schc(income, input_json, dbid):
     # Sum up all expenses
     expenses = input_json['expenses']
 
-    expenses_usd_sum = 0
     supplies_expenses = 0
     utilities_expense = 0
+    contract_labor = 0
+    invoice_labor = 0
+    travel_costs = 0
+    travel_meals = 0
+    business_property_exp = 0
+    office_expenses = 0
+    usd_hosts_paid = 0
+    # loop through expenses dict in tax_data col in db table
     for exp_type, expense_info in expenses.items():
         # if there is a cost associated, and the cost is not an empty string/falsy
         if "cost" in expense_info and expense_info['cost']:
             exp_amt = float(expense_info['cost'])
         
             # get expenses that fall under "supplies" 
-            if exp_type in ['hotspot', 'outdoor_bundle_kits', 'antenna']:
+            if exp_type in SUPPLIES_EXPENSES:
                 supplies_expenses += exp_amt
         
             # get expenses that fall under "utilities"
-            if exp_type in ['internet']:
+            if exp_type in UTILITIES_EXPENSES:
                 utilities_expense += exp_amt
+
+            # get labor expenses
+            if exp_type in LABOR_EXPENSES:
+                if expense_info['type'] == 'Independent contractor':
+                    contract_labor += exp_amt
+                if expense_info['type'] == 'Received invoice from company':
+                    invoice_labor += exp_amt
+                else:
+                    logger.warning(f"Invalid expense type for labor: {expense_info['type']}")
+
+            # get business property expenses
+            if exp_type in BUSINESS_EXPENSES:
+                business_property_exp += exp_amt
+
+            # get office expenses
+            if exp_type in OFFICE_EXPENSES:
+                office_expenses += exp_amt
             
-            expenses_usd_sum += exp_amt
             logger.debug(f"Expense: {exp_type} --> Amount: ${exp_amt}")
 
+        # get travel expenses - separate bc multiple 'cost' values in dict
+        if exp_type in TRAVEL_EXPENSES:
+            if expense_info['miles_traveled']:
+                miles_traveled_cost = MILEAGE_RATE * float(expense_info['miles_traveled'])
+                travel_costs += miles_traveled_cost
+                logger.debug(f"Expense: {exp_type} miles_traveled --> Amount: ${miles_traveled_cost}")
+            
+            if expense_info['travel_cost']:
+                travel_costs += float(expense_info['travel_cost'])
+                logger.debug(f"Expense: {exp_type} travel_cost --> Amount: ${expense_info['travel_cost']}")
+            
+            if expense_info['meals_cost']:
+                travel_meals += float(expense_info['meals_cost'])
+                logger.debug(f"Expense: {exp_type} meals_cost --> Amount: ${expense_info['meals_cost']}")
+
+        # get usd paid to any hosts, only if paid in USD
+        if exp_type == 'hosting':
+            if expense_info['payment_currency'] == 'USD':
+                contract_labor += float(expense_info['usd_paid'])
+                logger.debug(f"Expense: {exp_type} --> Amount: ${expense_info['usd_paid']}")
+            else:
+                logger.warning(f"Host paid in non-USD currency (id: {dbid} - {name}, {tax_year})")
+
+    # PART 2 - now that we have all expenses organized - categorize to schc fields
     # Sum together claimable expenses for reporting, add to pdf data 
-    expenses_claim_sum = supplies_expenses + utilities_expense
+    tax_data['11'] = contract_labor
+    tax_data['18'] = office_expenses
+    tax_data['20b'] = business_property_exp
     tax_data['22'] = supplies_expenses
+    tax_data['24a'] = travel_costs
+    tax_data['24b'] = travel_meals
     tax_data['25'] = utilities_expense
+
+    # sum these up for total 
+    expenses_claim_sum = contract_labor + office_expenses + business_property_exp + supplies_expenses + travel_meals + travel_costs + utilities_expense
     tax_data['28'] = expenses_claim_sum
     logger.info(f"Sum of all claimable expenses: ${expenses_claim_sum}")
 
@@ -78,6 +152,12 @@ def write_schc(income, input_json, dbid):
     net_profit = income - expenses_claim_sum
     logger.info(f"Total taxable earnings for year {tax_year}: ${net_profit}")
     tax_data['31'] = net_profit
+
+    # other expenses - add invoice labor here
+    if invoice_labor:
+        tax_data['part5-expense-entry'] = "Professional installation"
+        tax_data['part5-expense-amt'] = invoice_labor
+        tax_data['part5-other-expenses-sum'] = invoice_labor
 
     # Write tax_data to pdf 
     name_no_space = name.replace(" ", "_")
