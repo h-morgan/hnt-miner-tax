@@ -85,8 +85,7 @@ def process_csv_requests(id_=None):
                 # collect hotspot-level attributes that are written to csv
                 hotspot_attr = {
                     "wallet": valid_wallet,
-                    "hotspot_address": hotspot_addr,
-                    "state": hotspot_state
+                    "hotspot_address": hotspot_addr
                 }
 
                 # add this hotspot's rewards data to the list of all rewards
@@ -238,8 +237,7 @@ def process_schc_requests(id_=None):
                 # collect hotspot-level attributes that are written to csv
                 hotspot_attr = {
                     "wallet": valid_wallet,
-                    "hotspot_address": hotspot_addr,
-                    "state": hotspot_state
+                    "hotspot_address": hotspot_addr
                 }
 
                 # add this hotspot's rewards data to the list of all rewards
