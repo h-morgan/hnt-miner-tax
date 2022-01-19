@@ -4,6 +4,7 @@ from loguru import logger
 from requests.api import head
 from taxes.utils import fill_pdf
 from aws import save_1040_to_s3
+import os
 
 # expense categories, these are lists of keys of the dict keys in the expense dict in tax_data col in db table
 # the map is in the reformat.json file in hnttax_form_fetch/config
@@ -168,6 +169,9 @@ def write_schc(income, input_json, dbid):
     # save to aws s3
     aws_filename = f"{dbid}/{output_pdf}"
     save_1040_to_s3(local_file, file_year=tax_year, aws_file_name=aws_filename)
+
+    # delete local file version of sch c
+    os.remove(local_file)
 
     
     
