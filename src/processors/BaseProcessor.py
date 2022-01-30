@@ -3,6 +3,7 @@ from loguru import logger
 from db.hntdb import hnt_db_engine, hnt_metadata
 from sqlalchemy import select
 from abc import abstractstaticmethod
+import pandas as pd
 
 
 class BaseProcessor:
@@ -99,3 +100,89 @@ class BaseProcessor:
         else:
             for row in self._get_rows():
                 yield self._transform_row(row)
+
+    def compile_hotspot_rewards(self, helium_client, wallet, hotspots, year):
+        """
+        Compiles a df of hotspot rewards using the Helium client and given
+        a list of hotspots
+        """
+
+        num_hotspots = len(hotspots['data'])
+        all_rewards = []
+        x = 1
+        # loop through each hotpost and compile list of all transactions associated with this wallet
+        for hotspot in hotspots['data']:
+            logger.info(f"[{self.HNT_SERVICE_NAME}] hotspot {x} of {num_hotspots}")
+            hotspot_addr = hotspot['address']
+            logger.info(f"[{self.HNT_SERVICE_NAME}] retrieving hotspot reward activity for hotspot: {hotspot_addr}")
+
+            # collect hotspot-level attributes that are written to csv
+            hotspot_attr = {
+                "wallet": wallet,
+                "hotspot_address": hotspot_addr
+            }
+
+            # add this hotspot's rewards data to the list of all rewards
+            for reward in helium_client.get_hotspot_rewards(year, hotspot_addr):
+                
+                # transform the returned reward data into our format for saving to csv
+                transformed_reward = helium_client.transform_reward(reward)
+                complete_row = {
+                    **transformed_reward,
+                    **hotspot_attr
+                }
+                all_rewards.append(complete_row)
+
+            # increment the hotspot counter, for logging
+            x += 1
+
+        # once all rewards are collected for a wallet, convert to dataframe and save to csv
+        if all_rewards:
+            df = pd.DataFrame(all_rewards)
+            return df
+        
+        else:
+            return
+
+    def compile_validator_rewards(self, helium_client, wallet, validators, year):
+        """
+        Compiles a df of validator rewards using the Helium client and given
+        a list of validators
+        """
+
+        num_validators = len(validators['data'])
+        all_rewards = []
+        x = 1
+        # loop through each hotpost and compile list of all transactions associated with this wallet
+        for validator in validators['data']:
+            logger.info(f"[{self.HNT_SERVICE_NAME}] validator {x} of {num_validators}")
+            validator_addr = validator['address']
+            logger.info(f"[{self.HNT_SERVICE_NAME}] retrieving validator reward activity for validator: {validator_addr}")
+
+            # collect hotspot-level attributes that are written to csv
+            validator_attr = {
+                "wallet": wallet,
+                "validator_address": validator_addr
+            }
+
+            # add this hotspot's rewards data to the list of all rewards
+            for reward in helium_client.get_validator_rewards(year, validator_addr):
+                
+                # transform the returned reward data into our format for saving to csv
+                transformed_reward = helium_client.transform_reward(reward)
+                complete_row = {
+                    **transformed_reward,
+                    **validator_attr
+                }
+                all_rewards.append(complete_row)
+
+            # increment the hotspot counter, for logging
+            x += 1
+
+        # once all rewards are collected for a wallet, convert to dataframe and save to csv
+        if all_rewards:
+            df = pd.DataFrame(all_rewards)
+            return df
+        
+        else:
+            return
