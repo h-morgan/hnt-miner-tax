@@ -230,7 +230,7 @@ def process_schc_requests(id_=None):
             if all_hotspot_rewards is not None:  
             
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all hotspot reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
-                file_name = f"{row_id}/{row_id}_{year}_{valid_wallet[0:7]}_rewards.csv"
+                file_name = f"{row_id}/{row_id}_{year}_{valid_wallet[0:7]}_hotspots.csv"
                 save_df_to_s3(all_hotspot_rewards, request_type='schc', file_year=year, file_name=file_name)
 
                 # Once csv is compiled, we need the total in the USD column 
