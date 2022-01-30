@@ -25,6 +25,7 @@ class HeliumClient:
     URL_ACCOUNTS_BASE = None
     URL_HOTSPOTS_BASE = None
     URL_ORACLE_BASE = None
+    URL_VALIDATORS_BASE = None
 
     def __init__(self, base_url=None):
         self.base_url = base_url or os.getenv("HELIUM_API_URL")
@@ -40,6 +41,7 @@ class HeliumClient:
         self.URL_ACCOUNTS_BASE = urljoin(self.base_url, "accounts")
         self.URL_HOTSPOTS_BASE = urljoin(self.base_url, "hotspots")
         self.URL_ORACLE_BASE = urljoin(self.base_url, "oracle/prices")
+        self.URL_VALIDATORS_BASE = urljoin(self.base_url, "validators")
 
 
     def validate_wallet(self, wallet_addr):
@@ -107,9 +109,24 @@ class HeliumClient:
         resp.raise_for_status()
 
         # load response body
-        wallet_data = resp.json()
+        hotspots_data = resp.json()
 
-        return wallet_data
+        return hotspots_data
+
+
+    def get_validators_for_wallet(self, wallet_addr):
+        
+        # build url to hit in helium with given wallet address
+        url = '/'.join([self.URL_ACCOUNTS_BASE, wallet_addr, "validators"])        # make request, raise exceptions if they come up
+        
+        # make request, raise exceptions if they come up
+        resp = self._session.get(url, headers=self.HEADERS)
+        resp.raise_for_status()
+
+        # load response body
+        validators_data = resp.json()
+
+        return validators_data
 
 
     def get_hotspot_state_locations(self, hotspots_data):
@@ -128,7 +145,7 @@ class HeliumClient:
             for hotspot in hotspots_data['data']:
                 hotspot_country = hotspot['geocode']['short_country']
                 hotspot_state = hotspot['geocode']['short_state']
-                if hotspot_country != 'US':
+                if hotspot_country != 'US' and hotspot_country:
                     logger.warning("Non-US country detected in hotspot locations")
                     non_usd_location = True
                 
@@ -165,6 +182,48 @@ class HeliumClient:
             # if we don't have a cursor value (usually first request) hit endpoint normally
             if next_cursor is None:
                 logger.info(f"[{self.service_name}] Getting initial data for Helium hotspot {hotspot_addr} for year {year}")
+                resp = self._session.get(url, headers=self.HEADERS)
+
+            else:
+                url = '&'.join([url, f"cursor={next_cursor}"])
+                resp = self._session.get(url, headers=self.HEADERS)
+
+            resp.raise_for_status()
+            logger.info(f"[{self.service_name}] Rewards request status: {resp.status_code}, url: {url}")
+            resp_data = resp.json()
+
+            # if there's data, yield it
+            if 'data' in resp_data:
+                num_rewards = len(resp_data['data'])
+                logger.info(f"[{self.service_name}] {num_rewards} new rewards transactions being recorded")
+                for reward in resp_data['data']:
+                    yield reward
+
+            # determine if paginated results + update cursor value if so
+            if resp_data.get('cursor'):
+                # find number of rewards transactions on this page - for logging
+                logger.info(f"[{self.service_name}] Retrieved paginated cursor data")
+                next_cursor = resp_data.get('cursor')
+
+            # if there's no next cursor, we break
+            if resp_data.get('cursor') is None:
+                break
+
+    
+    def get_validator_rewards(self, year, validator_addr):
+
+        next_year = str(int(year) + 1)
+        url_query = f"rewards?max_time={next_year}-01-01&min_time={year}-01-01" # should be 01-01
+    
+        next_cursor = None
+
+        while True:
+            # need this here to reset base url for this query each time we loop
+            url = '/'.join([self.URL_VALIDATORS_BASE, validator_addr, url_query]) 
+
+            # if we don't have a cursor value (usually first request) hit endpoint normally
+            if next_cursor is None:
+                logger.info(f"[{self.service_name}] Getting initial data for Helium validator {validator_addr} for year {year}")
                 resp = self._session.get(url, headers=self.HEADERS)
 
             else:
