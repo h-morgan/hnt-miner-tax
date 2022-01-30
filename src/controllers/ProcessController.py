@@ -68,50 +68,42 @@ def process_csv_requests(id_=None):
         else:
             logger.info(f"[{processor.HNT_SERVICE_NAME}] valid wallet found on Helium blockchain, processing request for tax year {year}, wallet: {valid_wallet}")
 
-            # get all hotspots associated with this wallet
+            # get all hotspots associated with this wallet + hotspot rewards
             hotspots = client.get_hotspots_for_wallet(valid_wallet)
             num_hotspots = len(hotspots['data'])
             logger.info(f"[{processor.HNT_SERVICE_NAME}] num hotspots associated with this address: {num_hotspots}")
             
-            all_rewards = []
-            x = 1
-            # loop through each hotpost and compile list of all transactions associated with this wallet
-            for hotspot in hotspots['data']:
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] hotspot {x} of {num_hotspots}")
-                hotspot_addr = hotspot['address']
-                hotspot_state = hotspot['geocode']['short_state']
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] retrieving hotspot reward activity for hotspot: {hotspot_addr}")
+            all_hotspot_rewards = processor.compile_hotspot_rewards(client, valid_wallet, hotspots, year)
+            
+            # get all validators associated with this wallet
+            validators = client.get_validators_for_wallet(valid_wallet)
+            num_validators = len(validators['data'])
+            logger.info(f"[{processor.HNT_SERVICE_NAME}] num validators associated with this address: {num_validators}")
 
-                # collect hotspot-level attributes that are written to csv
-                hotspot_attr = {
-                    "wallet": valid_wallet,
-                    "hotspot_address": hotspot_addr
-                }
-
-                # add this hotspot's rewards data to the list of all rewards
-                for reward in client.get_hotspot_rewards(year, hotspot_addr):
-                    
-                    # transform the returned reward data into our format for saving to csv
-                    transformed_reward = client.transform_reward(reward)
-                    complete_row = {
-                        **transformed_reward,
-                        **hotspot_attr
-                    }
-                    all_rewards.append(complete_row)
-
-                # increment the hotspot counter, for logging
-                x += 1
+            all_validator_rewards = processor.compile_validator_rewards(client, valid_wallet, validators, year)
 
             # once all rewards are collected for a wallet, convert to dataframe and save to csv
-            if all_rewards:
-                df = pd.DataFrame(all_rewards)
+            total_usd = 0
+            if all_hotspot_rewards is not None:
             
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
-                file_name = f"{row_id}_{year}_{valid_wallet[0:7]}.csv"
-                save_df_to_s3(df, request_type='csv', file_year=year, file_name=file_name)
+                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all hotspot reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
+                h_file_name = f"{row_id}_{year}_{valid_wallet[0:7]}_hotspots.csv"
+                save_df_to_s3(all_hotspot_rewards, request_type='csv', file_year=year, file_name=h_file_name)
+                hotspot_usd = round(all_hotspot_rewards['usd'].sum(), 3)
+                total_usd += hotspot_usd
 
+            # if we got validator rewards, write those to csv
+            if all_validator_rewards is not None:
+            
+                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all validator reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
+                v_file_name = f"{row_id}_{year}_{valid_wallet[0:7]}_validators.csv"
+                save_df_to_s3(all_validator_rewards, request_type='csv', file_year=year, file_name=v_file_name)
+
+                validator_usd = round(all_validator_rewards['usd'].sum(), 3)
+                total_usd += validator_usd
+                
+            if all_hotspot_rewards is not None or all_validator_rewards is not None:
                 # Once csv is compiled, we need the total in the USD column 
-                total_usd = round(df['usd'].sum(), 3)
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Total usd income for year {year}: ${total_usd}") 
 
                 # update hnttax db for this request
@@ -131,7 +123,7 @@ def process_csv_requests(id_=None):
                     "status": "empty",
                     "errors": {
                         "msg": msg,
-                        "stage": "all hotspot reward collection for wallet - empty csv"
+                        "stage": "reward collection for wallet - empty csv"
                     },
                     "processed_at": datetime.utcnow(),
                     "num_hotspots": num_hotspots,
@@ -224,51 +216,45 @@ def process_schc_requests(id_=None):
             elif num_hotspots > 1 and not is_single_state:
                 service_level = SERVICE_KEY["single_state_mult_miners"]
             
-            ## STEP 4 - compile csv rewards summary
-            all_rewards = []
-            x = 1
-            # loop through each hotpost and compile list of all transactions associated with this wallet
-            for hotspot in hotspots['data']:
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] hotspot {x} of {num_hotspots}")
-                hotspot_addr = hotspot['address']
-                hotspot_state = hotspot['geocode']['short_state']
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] retrieving hotspot reward activity for hotspot: {hotspot_addr}")
+            all_hotspot_rewards = processor.compile_hotspot_rewards(client, valid_wallet, hotspots, year)
 
-                # collect hotspot-level attributes that are written to csv
-                hotspot_attr = {
-                    "wallet": valid_wallet,
-                    "hotspot_address": hotspot_addr
-                }
+            # STEP 4 - get all validators associated with this wallet
+            validators = client.get_validators_for_wallet(valid_wallet)
+            num_validators = len(validators['data'])
+            logger.info(f"[{processor.HNT_SERVICE_NAME}] num validators associated with this address: {num_validators}")
 
-                # add this hotspot's rewards data to the list of all rewards
-                for reward in client.get_hotspot_rewards(year, hotspot_addr):
-                    
-                    # transform the returned reward data into our format for saving to csv
-                    transformed_reward = client.transform_reward(reward)
-                    complete_row = {
-                        **transformed_reward,
-                        **hotspot_attr
-                    }
-                    all_rewards.append(complete_row)
+            all_validator_rewards = processor.compile_validator_rewards(client, valid_wallet, validators, year)
 
-                # increment the hotspot counter, for logging
-                x += 1
-
+            total_usd = 0
             # once all rewards are collected for a wallet, convert to dataframe and save to csv
-            if all_rewards:
-                df = pd.DataFrame(all_rewards)
+            if all_hotspot_rewards is not None:  
             
-                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
+                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all hotspot reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
                 file_name = f"{row_id}/{row_id}_{year}_{valid_wallet[0:7]}_rewards.csv"
-                save_df_to_s3(df, request_type='schc', file_year=year, file_name=file_name)
+                save_df_to_s3(all_hotspot_rewards, request_type='schc', file_year=year, file_name=file_name)
 
                 # Once csv is compiled, we need the total in the USD column 
-                total_usd = round(df['usd'].sum(), 3)
+                hotspot_usd = round(all_hotspot_rewards['usd'].sum(), 3)
+                total_usd += hotspot_usd
+
+                # update hnttax db values for this request
+                num_hotspots = num_hotspots
+            
+            # if we got validator rewards, write those to csv
+            if all_validator_rewards is not None:
+            
+                logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all validator reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
+                v_file_name = f"{row_id}/{row_id}_{year}_{valid_wallet[0:7]}_validators.csv"
+                save_df_to_s3(all_validator_rewards, request_type='csv', file_year=year, file_name=v_file_name)
+
+                validator_usd = round(all_validator_rewards['usd'].sum(), 3)
+                total_usd += validator_usd
+
+            if all_hotspot_rewards is not None or all_validator_rewards is not None:
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Total usd income for year {year}: ${total_usd}") 
 
                 # update hnttax db values for this request
                 income = total_usd
-                num_hotspots = num_hotspots
                 status = "processed"
 
             # if they had no mining rewards, log status as empty but still might have expenses, so still make schedc file
@@ -289,8 +275,6 @@ def process_schc_requests(id_=None):
             ## STEP 6 - create PDF schedule c form 
             # either way, we want to create a schedule c form for this person, they may have expenses
             write_schc(income, tax_data, dbid=row_id)
-
-            ## STEP 7 - move receipts from hnttax server to aws s3
 
             ## STEP 8 - update values in the database
             processed_at = datetime.utcnow()
