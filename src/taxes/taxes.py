@@ -1,9 +1,9 @@
 import json, time, random
 from loguru import logger
-
+from datetime import datetime
 from requests.api import head
 from taxes.utils import fill_pdf
-from aws import save_1040_to_s3
+from aws import save_to_s3
 import os
 
 # expense categories, these are lists of keys of the dict keys in the expense dict in tax_data col in db table
@@ -41,11 +41,48 @@ def write_data_to_1040(output_filename, data):
     fillable_data = {}
     for key, value in pdf_keys.items():
         if key in data.keys():
+            # if this is an amount, check if > 0
+            if (type(data[key]) == int or type(data[key]) == float) and data[key] == 0:
+                continue
+
             fillable_data[value] = data[key]
 
     logger.info(f"Saving completed 1040 schedule c for to: {output_file}")
     fill_pdf(pdf_file, output_file, fillable_data)
     return output_file
+
+
+def write_data_to_txf(filename, tax_data):
+    """
+    Takes in tax_data dict used to write to pdf, creates a txf file and saves locally
+    Returns local filename 
+    """
+    output_file = "output/" + filename
+    key_file = "tax_forms/txf_key.json"
+
+    pdf_keys = json.load(open(key_file, 'r'))
+    todays_date = datetime.today().strftime('%m-%d-%Y')
+
+    with open(output_file, 'w') as txf:
+        # add header to output file
+        header_fields = ["V042\n", "AhntTax TXF Software\n", f"{todays_date}\n", "^\n"]
+        txf.writelines(header_fields)
+
+        # add descriptive fields 
+        for key, amt in tax_data.items():
+            if key in pdf_keys.keys():
+                # use key of this item in tax_data to access map details for txf
+                descriptors = pdf_keys[key]["descriptors"]
+                txf.writelines(descriptors)
+
+                # Add amount to next line
+                txf.write(f"${amt}\n")
+
+                # add carrot to separate sections
+                txf.write("^\n")
+    
+    return output_file
+
 
 
 def write_schc(income, input_json, dbid):
@@ -164,14 +201,20 @@ def write_schc(income, input_json, dbid):
     name_no_space = name.replace(" ", "_")
     output_pdf = f"{name_no_space}_{tax_year}_1040sc.pdf"
     logger.debug(f"Input dict for tax form: {tax_data}")
-    local_file = write_data_to_1040(output_pdf, tax_data)
+    local_pdf_file = write_data_to_1040(output_pdf, tax_data)
 
-    # save to aws s3
+    # save schedule c pdf to aws s3
     aws_filename = f"{dbid}/{output_pdf}"
-    save_1040_to_s3(local_file, file_year=tax_year, aws_file_name=aws_filename)
+    save_to_s3(local_pdf_file, file_year=tax_year, aws_file_name=aws_filename)
 
-    # delete local file version of sch c
-    os.remove(local_file)
+    # Write tax data to txf file
+    output_txf = f"{name_no_space}_{tax_year}_1040sc.txf"
+    local_txf_file = write_data_to_txf(output_txf, tax_data)
 
-    
-    
+    # save txf to aws s3
+    aws_txf_filename = f"{dbid}/{output_txf}"
+    save_to_s3(local_txf_file, file_year=tax_year, aws_file_name=aws_txf_filename)
+
+    # delete local file versions of sch c and txf
+    os.remove(local_pdf_file)
+    os.remove(local_txf_file)
