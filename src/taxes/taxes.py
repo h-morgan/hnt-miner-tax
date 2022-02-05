@@ -89,6 +89,10 @@ def write_schc(income, input_json, dbid):
     """
     Takes in input data in json format, calls get_helium_rewards and performs steps to fill pdf
     """
+    # validation - if no income, set to 0
+    if income is None:
+        income = 0
+    
     name = input_json['name']
     tax_year = input_json['tax_year']
 
