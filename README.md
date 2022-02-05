@@ -53,6 +53,11 @@ HNTTAX_DATABASE_NAME=hnttax
 HELIUM_API_URL=https://api.helium.io/v1/
 ```
 
+If you're running this service during development/debugging, provide the following additional env var to save outputs to a `dev` folder within S3:
+```
+DEV_S3_FOLDER=dev
+```
+
 ## 2. How to run
 
 To run this service, navigate to the `src/` directory. From here, you can use the service's cli tool with varying commands as needed. 
@@ -77,7 +82,35 @@ This will update the database columns (`processed_at`, `status`, `income`, and `
 
 ### Process Schedule C Requests
 
-This process is still in development.
+To run this service and generate CSV's as well as completed Schedule C forms (in both PDF and TXF format) for all new Schedule C requests in our hnttax database (all rows in the `hnt_schedc_requests` table with `status=new`):
+
+```
+python process.py -s schc
+```
+
+To run this service for a given row id in our database `hnt_schedc_requests` table:
+
+```
+python process.py -s schc --id <id>
+```
+
+This will update the following database columns:
+- **processed_at** (time of completed process)
+- **status** (--> `processed`, `processed_no_rewards`, or `error`)
+- **service** (1, 2, 3, or null, correspoding with the options in the `services` table)
+- **errors** (updates with a json of any errors encountered during processing)
+- **income** (total USD income from mining - hotspots and validators combined)
+- **num_hotspots** (total number of hotspots associated with wallet)
+- **hotspot_locations** (a list of json data containing location info for each hotspot)
+- **flags** (a json of booleans of any flags encountered during processing - for example, `hotspot_moved_states: true`)
+
+The process will also save output files in our AWS S3 bucket. It will create a folder (or save to an existing folder, if there were receipts uploaded during the [hnttax-form-fetch](https://github.com/h-morgan/hnttax-form-fetch) process). The process will save the following to a folder (named corresponding with the db id):
+- csv of hotspot mining rewards summary (if any)
+- csv of validator rewards summary (if any)
+- Schedule C form PDF
+- SChedule C form TXF
+
+This will be in addition to any receipts that the client uploaded, which (if any) are retrieved during the [hnttax-form-fetch](https://github.com/h-morgan/hnttax-form-fetch) process.
 
 ## AWS
 
@@ -91,77 +124,3 @@ This process can be done by running the script to build the new image, tag it, a
 ```
 ./prod-upload.sh
 ```
-
-<hr>
-
-## OLD SECTIONS (KEEPING FOR NOW IN CASE NEEDED)
-
-There are 2 possible ways to run the cli tool (see their respective sections for more info) - 
-
-[a](#a-generate-helium-rewards-csv) - generate the USD sum of all Helium rewards for given wallet address(es) and tax year, as well as a CSV output of all transactions
-
-[b](#b-compute-taxes-for-a-client) - generate a Schedule C form for a client given a json file
-
-
-### A. Generate Helium Rewards CSV
-
-#### CLI Arguments
-
-To run the tool with the wallet address and tax year as inline cli arguments, it looks like this:
-```bash
-python cli.py rewards-csv --account abcde12345 --year 2020
-```
-Where **abcde12345** is your Helium wallet address, and **2020** is the year of interest. You should update these two to be the values you need (your own wallet address and year you want to compute your taxes for).
-
-#### Input Arguments
-A second way to run the tool is via prompted input arguments. To run the tool this way, just run the following command:
-```bash
-python helium.py
-```
-You will then be prompted within the terminal for your wallet address, which you can enter directly in the terminal and then hit enter. Next, you will be prompted for the year, which you can enter as well and hit enter. After you provide those 2 pieces of information, the tool will run on its own.
-
-#### CSV Output
-
-This service produces a csv file detailing all of the HNT rewards earned connected to the specified wallet provided, for the tax year requested. The csv contains the following fields:
-
-```bash
-timestamp, wallet address, hotspot address, block, hnt amt, oracle price, usd, hash
-```
-The file will be saved in the root of the project folder locally on your machine. The service will also output a sum total of all rewards earned in the requested tax year in USD, which will be printed out directly in the terminal.
-
-### B. Compute Taxes for a Client
-
-This option requires an input json file to be provided in a `clients/` directory within the top level of this repo. The json file provided needs to have the following contents:
-
-```json
-{
-    "first_name": "Sam",
-    "last_name": "Smith",
-    "email": "sam@test.com",
-    "tax_year": 2020,
-    "helium_wallet_address": "1234567abcdefg09876",
-    "state_of_residence": "Massachusetts",
-    "expenses": [
-        {
-            "type": "hotspot",
-            "amount_usd": 400.00
-        },
-        {
-            "type": "antenna",
-            "amount_usd": 70.00
-        },
-        {
-            "type": "hardware_equipment_other",
-            "amount_usd": 10.00
-        },
-        {
-            "type": "internet",
-            "amount_usd": 350.00
-        }
-    ]
-}
-```
-
-The expenses section of this sample is just showing possible examples of expenses, but at a minimum there needs to be an expenses key with a list of contents describing the expenses of that tax year (can be empty as well). 
-
-FUTURE NOTE: The idea is these json files will eventually be generated from the forms users will fill out on the hnttax.us website, but for now I'm manually creating these json inputs
