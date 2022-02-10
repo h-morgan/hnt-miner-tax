@@ -130,6 +130,8 @@ def process_csv_requests(id_=None):
                 }
                 update_empty_stmt = csv_table.update().where(csv_table.c.id == row_id)
                 hnt_db.execute(update_empty_stmt, update_empty)
+            
+            # add customer to stripe account
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new CSV requests")
 
