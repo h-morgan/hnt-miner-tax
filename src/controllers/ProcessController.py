@@ -10,6 +10,8 @@ from aws import save_df_to_s3
 from datetime import datetime
 from taxes.taxes import write_schc
 from taxes.utils import collect_flags
+from controllers import create_stripe_customer
+import os
 
 
 # key for determining service level for schc processing
@@ -130,8 +132,6 @@ def process_csv_requests(id_=None):
                 }
                 update_empty_stmt = csv_table.update().where(csv_table.c.id == row_id)
                 hnt_db.execute(update_empty_stmt, update_empty)
-            
-            # add customer to stripe account
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new CSV requests")
 
@@ -292,6 +292,14 @@ def process_schc_requests(id_=None):
             }
             update_stmt = schc_table.update().where(schc_table.c.id == row_id)
             hnt_db.execute(update_stmt, update_vals)
+
+        # add customer to stripe account
+        try:
+            create_stripe_customer(name=form['name'], email=form['email'])
+            logger.info(f"[{processor.HNT_SERVICE_NAME}] Customer added to Stripe ({form['name']}, {form['email']})")
+
+        except Exception as e:
+            logger.error(f"[{processor.HNT_SERVICE_NAME}] Could not add customer to stripe: ({e})")
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new schedule c requests")
 

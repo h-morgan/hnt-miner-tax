@@ -17,10 +17,17 @@ class SchcProcessor(BaseProcessor):
         wallet = row.wallet
         year = row.year
         tax_data = row.tax_data
+        email = row.email
+
+        # get name from tax data (used in customer creation in stripe) and capitalize
+        name = tax_data['name']
+        name_upper = " ".join(w.capitalize() for w in name.split())
 
         return {
             "id": row_id,
             "wallet": wallet,
             "year": year,
+            "email": email,
+            "name": name_upper,
             "tax_data": tax_data
         }
