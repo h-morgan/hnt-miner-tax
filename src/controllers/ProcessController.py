@@ -12,6 +12,7 @@ from taxes.taxes import write_schc
 from taxes.utils import collect_flags
 from controllers import create_stripe_customer
 import os
+import stripe
 
 
 # key for determining service level for schc processing
@@ -296,10 +297,27 @@ def process_schc_requests(id_=None):
         # add customer to stripe account
         try:
             create_stripe_customer(name=form['name'], email=form['email'])
-            logger.info(f"[{processor.HNT_SERVICE_NAME}] Customer added to Stripe ({form['name']}, {form['email']})")
 
         except Exception as e:
             logger.error(f"[{processor.HNT_SERVICE_NAME}] Could not add customer to stripe: ({e})")
 
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new schedule c requests")
+
+
+def process_test():
+
+    STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
+    stripe.api_key = STRIPE_API_KEY
+
+    # used for when i want to test things
+    email = 'haleymorgan3264@gmail.com'
+
+    customers = stripe.Customer.list(email=email)
+    
+    if customers['data']:
+        print('found a customer')
+
+    else:
+        print('none')
+    
 

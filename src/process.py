@@ -1,4 +1,4 @@
-from controllers.ProcessController import process_csv_requests, process_schc_requests
+from controllers.ProcessController import process_csv_requests, process_schc_requests, process_test
 import click
 from loguru import logger
 import sys
@@ -25,6 +25,7 @@ def run(service, id, log_level):
 
     elif service == "test":
         logger.info("Running in test mode")
+        process_test()
         
     else:
         logger.warn("Incompatible service requested. Please fetch csv, schc, or both.")
