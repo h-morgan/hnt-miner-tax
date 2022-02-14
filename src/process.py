@@ -25,7 +25,7 @@ def run(service, id, log_level):
 
     elif service == "test":
         logger.info("Running in test mode")
-        process_test()
+        process_test(id_=id)
         
     else:
         logger.warn("Incompatible service requested. Please fetch csv, schc, or both.")

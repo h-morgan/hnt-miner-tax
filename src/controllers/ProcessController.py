@@ -148,7 +148,7 @@ def process_schc_requests(id_=None):
 
     schc_table = hnt_metadata.tables[processor.HNT_DB_TABLE_NAME]
 
-    # loop over new form entries 1 by 1, and run the csv-creation code
+    # loop over new form entries 1 by 1, and run the schc-creation code
     for form in processor.get_forms(id_=id_):
         
         row_id = form['id']
@@ -296,7 +296,7 @@ def process_schc_requests(id_=None):
 
         # add customer to stripe account
         try:
-            create_stripe_customer(name=form['name'], email=form['email'])
+            create_stripe_customer(name=form['name'], email=form['email'], db_id=row_id, service_level=service_level)
 
         except Exception as e:
             logger.error(f"[{processor.HNT_SERVICE_NAME}] Could not add customer to stripe: ({e})")
@@ -304,20 +304,16 @@ def process_schc_requests(id_=None):
     logger.info(f"[{processor.HNT_SERVICE_NAME}] DONE - completed processing all new schedule c requests")
 
 
-def process_test():
+def process_test(id_):
 
-    STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
-    stripe.api_key = STRIPE_API_KEY
+    processor = SchcProcessor()
 
-    # used for when i want to test things
-    email = 'haleymorgan3264@gmail.com'
+    # loop over new form entries 1 by 1, and run the schc-creation code
+    for form in processor.get_forms(id_=id_):
+        row_id = form['id']
+        name=form['name']
+        email=form['email']
+        service = form['service']
 
-    customers = stripe.Customer.list(email=email)
-    
-    if customers['data']:
-        print('found a customer')
-
-    else:
-        print('none')
-    
+        create_stripe_customer(name=form['name'], email=form['email'], db_id=row_id, service_level=service)
 

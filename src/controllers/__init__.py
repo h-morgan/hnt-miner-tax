@@ -1,11 +1,12 @@
 from logging import LogRecord
+from sqlalchemy.sql.schema import MetaData
 import stripe
 import os
 from loguru import logger
 
 
 
-def create_stripe_customer(name, email):
+def create_stripe_customer(name, email, db_id, service_level):
 
     # load and set stripe API key
     STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
@@ -22,6 +23,10 @@ def create_stripe_customer(name, email):
         logger.info(f"[stripe] Customer added to Stripe ({name}, {email})")
         stripe.Customer.create(
             email = email,
-            name = name
+            name = name,
+            metadata = {
+                "hnttax_db_id": db_id,
+                "service_level": service_level
+            }
         )
 
