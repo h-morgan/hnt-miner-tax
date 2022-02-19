@@ -78,5 +78,11 @@ def collect_flags(tax_form):
 
     if tax_form["expenses"]["validator_equipment"]["had_validator"] not in no_values:
         flags["has_validator"] = True
+    
+    if tax_form['sold_traded_hnt'] not in no_values:
+        flags["sold_traded_hnt"] = True
+    
+    if tax_form['mined_other_crypto'] not in no_values:
+        flags["mined_other_crypto"] = True
 
     return flags
