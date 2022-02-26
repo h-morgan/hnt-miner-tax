@@ -77,7 +77,7 @@ def write_data_to_txf(filename, tax_data):
 
                 # If this is of type = expense, we want valu to be negative
                 item_type = pdf_keys[key]["type"]
-                if item_type == "expense":
+                if item_type == "expense" and amt > 0:
                     txf.write(f"$-{amt}\n")
                 else:
                     # Add amount to next line
