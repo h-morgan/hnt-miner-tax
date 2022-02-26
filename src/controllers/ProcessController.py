@@ -11,8 +11,7 @@ from datetime import datetime
 from taxes.taxes import write_schc
 from taxes.utils import collect_flags
 from controllers import create_stripe_customer
-import os
-import stripe
+from taxes import utils
 
 
 # key for determining service level for schc processing
@@ -307,13 +306,18 @@ def process_schc_requests(id_=None):
 def process_test(id_):
 
     processor = SchcProcessor()
+    client = HeliumClient()
+
+    schc_table = hnt_metadata.tables[processor.HNT_DB_TABLE_NAME]
 
     # loop over new form entries 1 by 1, and run the schc-creation code
     for form in processor.get_forms(id_=id_):
         row_id = form['id']
-        name=form['name']
-        email=form['email']
-        service = form['service']
+        tax_data = form['tax_data']
+        income = int(form['income'])
+        write_schc(income, tax_data, dbid=row_id)
+        
+    
 
-        create_stripe_customer(name=form['name'], email=form['email'], db_id=row_id, service_level=service)
+
 
