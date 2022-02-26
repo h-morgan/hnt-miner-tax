@@ -27,12 +27,12 @@ OFFICE_EXPENSES = ["office_expenses"]
 MILEAGE_RATE = 0.575
 
 
-def write_data_to_1040(output_filename, data):
+def write_data_to_1040(output_filename, data, tax_year):
     """
     Writes data dict to output_filename provided, overlaying the 1040 schedule c form
     """
-    pdf_file = "tax_forms/f1040sc.pdf"
-    key_file = "tax_forms/f1040sc_key.json"
+    pdf_file = f"tax_forms/f1040sc_{tax_year}.pdf"
+    key_file = f"tax_forms/f1040sc_{tax_year}_key.json"
     output_file = "output/" + output_filename
 
     pdf_keys = json.load(open(key_file, 'r'))
@@ -75,8 +75,13 @@ def write_data_to_txf(filename, tax_data):
                 descriptors = pdf_keys[key]["descriptors"]
                 txf.writelines(descriptors)
 
-                # Add amount to next line
-                txf.write(f"${amt}\n")
+                # If this is of type = expense, we want valu to be negative
+                item_type = pdf_keys[key]["type"]
+                if item_type == "expense":
+                    txf.write(f"$-{amt}\n")
+                else:
+                    # Add amount to next line
+                    txf.write(f"${amt}\n")
 
                 # add carrot to separate sections
                 txf.write("^\n")
@@ -177,35 +182,35 @@ def write_schc(income, input_json, dbid):
 
     # PART 2 - now that we have all expenses organized - categorize to schc fields
     # Sum together claimable expenses for reporting, add to pdf data 
-    tax_data['11'] = contract_labor
-    tax_data['18'] = office_expenses
-    tax_data['20b'] = business_property_exp
-    tax_data['22'] = supplies_expenses
-    tax_data['24a'] = travel_costs
-    tax_data['24b'] = travel_meals
-    tax_data['25'] = utilities_expense
+    tax_data['11'] = int(contract_labor)
+    tax_data['18'] = int(office_expenses)
+    tax_data['20b'] = int(business_property_exp)
+    tax_data['22'] = int(supplies_expenses)
+    tax_data['24a'] = int(travel_costs)
+    tax_data['24b'] = int(travel_meals)
+    tax_data['25'] = int(utilities_expense)
 
     # sum these up for total 
     expenses_claim_sum = contract_labor + office_expenses + business_property_exp + supplies_expenses + travel_meals + travel_costs + utilities_expense
-    tax_data['28'] = expenses_claim_sum
+    tax_data['28'] = int(expenses_claim_sum)
     logger.info(f"Sum of all claimable expenses: ${expenses_claim_sum}")
 
     # Subtract expense from rewards
     net_profit = income - expenses_claim_sum
     logger.info(f"Total taxable earnings for year {tax_year}: ${net_profit}")
-    tax_data['31'] = net_profit
+    tax_data['31'] = int(net_profit)
 
     # other expenses - add invoice labor here
     if invoice_labor:
         tax_data['part5-expense-entry'] = "Professional installation"
-        tax_data['part5-expense-amt'] = invoice_labor
-        tax_data['part5-other-expenses-sum'] = invoice_labor
+        tax_data['part5-expense-amt'] = int(invoice_labor)
+        tax_data['part5-other-expenses-sum'] = int(invoice_labor)
 
     # Write tax_data to pdf 
     name_no_space = name.replace(" ", "_")
     output_pdf = f"{name_no_space}_{tax_year}_1040sc.pdf"
     logger.debug(f"Input dict for tax form: {tax_data}")
-    local_pdf_file = write_data_to_1040(output_pdf, tax_data)
+    local_pdf_file = write_data_to_1040(output_pdf, tax_data, tax_year)
 
     # save schedule c pdf to aws s3
     aws_filename = f"{dbid}/{output_pdf}"
