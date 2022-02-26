@@ -17,6 +17,7 @@ class SchcProcessor(BaseProcessor):
         wallet = row.wallet
         year = row.year
         tax_data = row.tax_data
+        income = row.income
         email = row.email.lower()
 
         # get name from tax data (used in customer creation in stripe) and capitalize
@@ -29,5 +30,6 @@ class SchcProcessor(BaseProcessor):
             "year": year,
             "email": email,
             "name": name_upper,
-            "tax_data": tax_data
+            "tax_data": tax_data,
+            "income": income
         }

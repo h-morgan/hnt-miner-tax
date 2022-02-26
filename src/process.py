@@ -11,7 +11,8 @@ import sys
 def run(service, id, log_level):
     logger.remove()
     logger.add(sys.stderr, level=log_level.upper())
-
+    if id: 
+        logger.info(f'running for id: {id}')
 
     if service == "all":
         process_csv_requests(id_=id)
@@ -21,6 +22,7 @@ def run(service, id, log_level):
         process_csv_requests(id_=id)
 
     elif service == "schc":
+        print('here')
         process_schc_requests(id_=id)
 
     elif service == "test":
