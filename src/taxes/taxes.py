@@ -8,10 +8,17 @@ import os
 
 # expense categories, these are lists of keys of the dict keys in the expense dict in tax_data col in db table
 # the map is in the reformat.json file in hnttax_form_fetch/config
-SUPPLIES_EXPENSES = ["hotspot", "outdoor_bundle_kits", "antenna", "poe_injector", "coax_cable", 
-                     "grounding_equipment", "ethernet_cables", "solar_equipment", "other_equipment",
-                     "hardware_wallet", "validator_equipment"
-                    ]
+# SUPPLIES_EXPENSES = ["hotspot", "outdoor_bundle_kits", "antenna", "poe_injector", "coax_cable", 
+#                     "grounding_equipment", "ethernet_cables", "solar_equipment", "other_equipment",
+#                     "hardware_wallet", "validator_equipment"
+#                    ]
+SUPPLIES_EXPENSES = []
+
+# all supplies are now going to PART 5 OTHER EXPENSES - but commenting above in case we return to that
+PART_5_OTHER = ["hotspot", "outdoor_bundle_kits", "antenna", "poe_injector", "coax_cable",
+                "grounding_equipment", "ethernet_cables", "solar_equipment", "other_equipment",
+                "hardware_wallet", "validator_equipment"
+                ]
 
 UTILITIES_EXPENSES = ["internet", "cell_phone", "validator_utilities"]
 
@@ -23,8 +30,8 @@ BUSINESS_EXPENSES = ["business_property"]
 
 OFFICE_EXPENSES = ["office_expenses"]
 
-# 2020 mileage rate 
-MILEAGE_RATE = 0.575
+# 2021 mileage rate 
+MILEAGE_RATE = 0.56
 
 
 def write_data_to_1040(output_filename, data, tax_year):
@@ -98,21 +105,27 @@ def write_schc(income, input_json, dbid):
     if income is None:
         income = 0
     
+    # handle the non-computed fields
     name = input_json['name']
     tax_year = input_json['tax_year']
 
     logger.info(f"Preparing {tax_year} Schedule C form for: {name}")
-
 
     # build input pdf data as we go
     tax_data = {
         "name of proprietor": name,
     }
 
+    # handle the static (always the same for all clients) fields
+    tax_data['A'] = "Cryptocurrency mining"
+    tax_data['B'] = "523900"
+    tax_data['F1'] = True
+    tax_data['G-Y'] = True
+    
     tax_data['1-line'] = income
     tax_data['7'] = income
 
-    # Sum up all expenses
+    # Sum up all expenses - first get them from the input json tax_data dict
     expenses = input_json['expenses']
 
     supplies_expenses = 0
