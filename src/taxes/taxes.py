@@ -125,7 +125,7 @@ def write_schc(income, input_json, dbid):
     tax_data['1-line'] = income
     tax_data['7'] = income
 
-    # Sum up all expenses - first get them from the input json tax_data dict
+    # Sum up all expenses - first get them from the input json tax_data dict from db
     expenses = input_json['expenses']
 
     supplies_expenses = 0
@@ -136,6 +136,7 @@ def write_schc(income, input_json, dbid):
     travel_meals = 0
     business_property_exp = 0
     office_expenses = 0
+    part5_expenses = 0
     usd_hosts_paid = 0
     # loop through expenses dict in tax_data col in db table
     for exp_type, expense_info in expenses.items():
@@ -143,9 +144,9 @@ def write_schc(income, input_json, dbid):
         if "cost" in expense_info and expense_info['cost']:
             exp_amt = float(expense_info['cost'])
         
-            # get expenses that fall under "supplies" 
-            if exp_type in SUPPLIES_EXPENSES:
-                supplies_expenses += exp_amt
+            # get expenses that fall under "part 5 other" (we used to put these to supplies line) 
+            if exp_type in PART_5_OTHER:
+                part5_expenses += exp_amt
         
             # get expenses that fall under "utilities"
             if exp_type in UTILITIES_EXPENSES:
@@ -203,8 +204,26 @@ def write_schc(income, input_json, dbid):
     tax_data['24b'] = int(travel_meals)
     tax_data['25'] = int(utilities_expense)
 
+    # if part5 expesnes, write them to the entry/amt lines
+    part5_sum = 0
+    if part5_expenses:
+        tax_data['part5-expense-entry'] = "Miscellaneous equipment"
+        tax_data['part5-expense-amt'] = int(part5_expenses)
+        part5_sum += int(part5_expenses)
+
+    # other expenses - add invoice labor here
+    if invoice_labor:
+        tax_data['part5-entry-2'] = "Professional installation"
+        tax_data['part5-amt-2'] = int(invoice_labor)
+        part5_sum += int(invoice_labor)
+
+    # if we had any part 5 expenses at this point, write them to the total fields and field 27a
+    if part5_sum:    
+        tax_data['part5-other-expenses-sum'] = part5_sum
+        tax_data['27a'] = part5_sum
+
     # sum these up for total 
-    expenses_claim_sum = contract_labor + office_expenses + business_property_exp + supplies_expenses + travel_meals + travel_costs + utilities_expense
+    expenses_claim_sum = contract_labor + office_expenses + business_property_exp + supplies_expenses + travel_meals + travel_costs + utilities_expense + part5_sum
     tax_data['28'] = int(expenses_claim_sum)
     logger.info(f"Sum of all claimable expenses: ${expenses_claim_sum}")
 
@@ -212,12 +231,6 @@ def write_schc(income, input_json, dbid):
     net_profit = income - expenses_claim_sum
     logger.info(f"Total taxable earnings for year {tax_year}: ${net_profit}")
     tax_data['31'] = int(net_profit)
-
-    # other expenses - add invoice labor here
-    if invoice_labor:
-        tax_data['part5-expense-entry'] = "Professional installation"
-        tax_data['part5-expense-amt'] = int(invoice_labor)
-        tax_data['part5-other-expenses-sum'] = int(invoice_labor)
 
     # Write tax_data to pdf 
     name_no_space = name.replace(" ", "_")
