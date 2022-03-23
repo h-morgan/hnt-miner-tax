@@ -104,6 +104,8 @@ def write_schc(income, input_json, dbid):
     # validation - if no income, set to 0
     if income is None:
         income = 0
+    else:
+        income = int(income)
     
     # handle the non-computed fields
     name = input_json['name']
