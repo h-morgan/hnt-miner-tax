@@ -10,7 +10,7 @@ from aws import save_df_to_s3
 from datetime import datetime
 from taxes.taxes import write_schc
 from taxes.utils import collect_flags
-from controllers import create_stripe_customer
+from controllers import create_stripe_customer, save_csv
 from taxes import utils
 
 
@@ -90,7 +90,7 @@ def process_csv_requests(id_=None):
             
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all hotspot reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
                 h_file_name = f"{row_id}_{year}_{valid_wallet[0:7]}_hotspots.csv"
-                save_df_to_s3(all_hotspot_rewards, request_type='csv', file_year=year, file_name=h_file_name)
+                save_csv(all_hotspot_rewards, file_year=year, file_name=h_file_name)
                 hotspot_usd = round(all_hotspot_rewards['usd'].sum(), 3)
                 total_usd += hotspot_usd
 
@@ -99,7 +99,7 @@ def process_csv_requests(id_=None):
             
                 logger.info(f"[{processor.HNT_SERVICE_NAME}] Compilation of all validator reward transactions for db id {row_id} from year {year} complete. Saving to csv in AWS.")
                 v_file_name = f"{row_id}_{year}_{valid_wallet[0:7]}_validators.csv"
-                save_df_to_s3(all_validator_rewards, request_type='csv', file_year=year, file_name=v_file_name)
+                save_csv(all_validator_rewards, file_year=year, file_name=v_file_name)
 
                 validator_usd = round(all_validator_rewards['usd'].sum(), 3)
                 total_usd += validator_usd
@@ -140,6 +140,8 @@ def process_schc_requests(id_=None):
     """
     Processes all new csv requests in hnttax db (status="new")
     if id given, takes in db id to run the csv processor for
+
+    Phased out - we no longer provide this service but keeping here for now
     """
 
     processor = SchcProcessor()

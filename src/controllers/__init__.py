@@ -3,6 +3,7 @@ from sqlalchemy.sql.schema import MetaData
 import stripe
 import os
 from loguru import logger
+from pathlib import Path
 
 
 
@@ -29,4 +30,26 @@ def create_stripe_customer(name, email, db_id, service_level):
                 "service_level": service_level
             }
         )
+
+def save_csv(df, request_type='csv', file_year=2021, file_name='temp.csv'):
+    "save a given df to csv temp file. type can either be csv, or schc"
+
+    # get root directory
+    root_dir = os.getenv("TEMP_FILE_LOCATION")
+
+    # get file stem
+    file_stem = Path(file_name)
+
+    # if we're running in dev, prefix the file folder to save zip file to a dev folder
+    if os.getenv("DEV"):
+        file_path = f"{root_dir}dev/{file_stem}.zip"
+    else:
+        file_path = f"{root_dir}{file_stem}.zip"
+
+    # compress the file
+    compression_opts = dict(method='zip', archive_name=file_name)  
+
+    logger.info(f"Saving CSV to temp dir locally, path: {file_path}")
+    df.to_csv(file_path, index=False, compression=compression_opts) 
+
 
