@@ -37,19 +37,19 @@ def save_csv(df, request_type='csv', file_year=2021, file_name='temp.csv'):
     # get root directory
     root_dir = os.getenv("TEMP_FILE_LOCATION")
 
-    # get file stem
-    file_stem = Path(file_name)
+    # get file stem (NOTE: was using this when trying to zip file)
+    file_stem = Path(file_name).stem
 
     # if we're running in dev, prefix the file folder to save zip file to a dev folder
     if os.getenv("DEV"):
-        file_path = f"{root_dir}dev/{file_stem}.zip"
+        file_path = f"{root_dir}dev/{file_name}"
     else:
-        file_path = f"{root_dir}{file_stem}.zip"
+        file_path = f"{root_dir}{file_name}"
 
-    # compress the file
+    # compress the file - NOTE: was using this when trying to zip file
     compression_opts = dict(method='zip', archive_name=file_name)  
 
     logger.info(f"Saving CSV to temp dir locally, path: {file_path}")
-    df.to_csv(file_path, index=False, compression=compression_opts) 
+    df.to_csv(file_path, index=False) 
 
 
