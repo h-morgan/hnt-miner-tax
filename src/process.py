@@ -2,6 +2,7 @@ from controllers.ProcessController import process_csv_requests, process_schc_req
 import click
 import os
 from loguru import logger
+from datetime import date
 import sys
 
 
@@ -13,7 +14,8 @@ def run(service, id, log_level):
 
     logger.remove(0)
     log_root = os.getenv("LOG_FOLDER", "")
-    logger.add(f"{log_root}hnt-csv.log", rotation="1 month", level=log_level.upper())
+    log_date = date.today()
+    logger.add(f"{log_root}{log_date}_hnt-csv.log", rotation="1 month", level=log_level.upper())
 
     if id: 
         logger.info(f'running for id: {id}')
