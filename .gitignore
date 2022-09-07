@@ -5,3 +5,4 @@ venv/
 *.env
 dev.py
 output/
+*.log
