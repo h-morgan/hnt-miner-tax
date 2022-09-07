@@ -1,5 +1,6 @@
 from controllers.ProcessController import process_csv_requests, process_schc_requests, process_test
 import click
+import os
 from loguru import logger
 import sys
 
@@ -9,8 +10,11 @@ import sys
 @click.option("--id", default=None)
 @click.option("--log_level", '-l',  default="INFO", type=click.Choice(("INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"), case_sensitive=False))
 def run(service, id, log_level):
-    logger.remove()
-    logger.add(sys.stderr, level=log_level.upper())
+
+    logger.remove(0)
+    log_root = os.getenv("LOG_FOLDER", "")
+    logger.add(f"{log_root}hnt-csv.log", rotation="1 month", level=log_level.upper())
+
     if id: 
         logger.info(f'running for id: {id}')
 
